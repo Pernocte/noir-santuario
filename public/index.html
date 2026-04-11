@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOIR - Santuario Privado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* VARIABLES Y BASE */
+        :root { --bg-color: #0d0d0d; --panel-bg: #121212; --text-gold: #c6ac71; --input-border: #c6ac71; --button-border: #c6ac71; --font-serif: 'Playfair Display', serif; --font-sans: 'Montserrat', sans-serif; --transition-speed: 0.4s; }
+        body { margin: 0; padding: 0; background-color: var(--bg-color); background-image: radial-gradient(circle at center top, #1f1f1f 0%, #0d0d0d 100%); color: var(--text-gold); font-family: var(--font-sans); display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+        
+        /* LOGO */
+        .logo-container { display: flex; flex-direction: column; align-items: center; margin-top: 5vh; margin-bottom: 30px; transition: transform var(--transition-speed); }
+        .logo-icon { position: relative; width: 80px; height: 96px; margin-bottom: 15px; }
+        .logo-arch { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 60px; height: 80px; border: 2px solid var(--text-gold); border-bottom: none; border-top-left-radius: 40px; border-top-right-radius: 40px; }
+        .logo-moon { position: absolute; top: 25px; left: 50%; transform: translateX(-50%); width: 30px; height: 30px; border-radius: 50%; box-shadow: -5px 5px 0 0 var(--text-gold); }
+        .site-title { font-family: var(--font-serif); font-size: 50px; letter-spacing: 12px; margin: 0 0 0 12px; }
+        .site-subtitle { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; margin-top: 10px; color: #888; }
+
+        /* VISTAS */
+        #login-view, #dashboard-view { width: 100%; display: flex; flex-direction: column; align-items: center; transition: opacity var(--transition-speed), transform var(--transition-speed); }
+        #dashboard-view { display: none; opacity: 0; width: 95%; max-width: 1000px; flex-grow: 1; }
+
+        /* COMPONENTES */
+        .card { background-color: var(--panel-bg); padding: 40px; border-radius: 8px; border: 1px solid #222; box-shadow: 0 15px 40px rgba(0,0,0,0.8); text-align: center; width: 100%; max-width: 380px; box-sizing: border-box; }
+        .card h2 { font-family: var(--font-serif); font-size: 20px; font-weight: 400; letter-spacing: 2px; margin-top: 0; margin-bottom: 30px; color: var(--text-gold); }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #888; margin-bottom: 8px; }
+        .input-field, select.input-field, textarea.input-field { width: 100%; padding: 12px 15px; background-color: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: var(--text-gold); font-size: 14px; font-family: var(--font-sans); box-sizing: border-box; }
+        .input-field:focus { outline: none; border-color: var(--input-border); }
+        .code-input { text-align: center; font-size: 20px; letter-spacing: 15px; padding-left: 30px; }
+        .error-message { color: #ff4a4a; font-size: 11px; margin-top: -10px; margin-bottom: 15px; display: none; }
+        input[type="file"] { display: none; }
+        .file-upload-btn { display: inline-block; width: 100%; padding: 10px; background-color: #1a1a1a; border: 1px dashed #555; color: #888; text-align: center; border-radius: 4px; cursor: pointer; font-size: 12px; box-sizing: border-box; transition: border-color 0.3s; }
+        .file-upload-btn:hover { border-color: var(--text-gold); color: var(--text-gold); }
+        
+        .gold-button { width: 100%; padding: 15px; background-color: transparent; color: var(--text-gold); border: 1px solid var(--button-border); border-radius: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; margin-top: 10px; }
+        .gold-button:hover { background-color: rgba(198, 172, 113, 0.1); }
+        
+        .admin-inline-btn { border-color: #ff4a4a; color: #ff4a4a; font-size: 10px; padding: 10px; margin-top: 20px; }
+        .admin-inline-btn:hover { background-color: rgba(255, 74, 74, 0.1); }
+        .admin-add-btn { background-color: rgba(255, 74, 74, 0.05); border: 1px dashed #ff4a4a; color: #ff4a4a; padding: 15px; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 12px; font-weight: 600; letter-spacing: 2px; width: 100%; transition: 0.3s; margin-bottom: 20px; }
+        .admin-add-btn:hover { background-color: rgba(255, 74, 74, 0.15); }
+        .admin-only-block { display: none; }
+
+        /* NAVEGACIÓN Y TABS */
+        .nav-menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; width: 100%; }
+        .nav-btn { background: none; border: none; color: #888; font-family: var(--font-sans); font-size: 12px; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; transition: color 0.3s; padding: 5px 10px; }
+        .nav-btn:hover, .nav-btn.active { color: var(--text-gold); }
+        .section-content { display: none; width: 100%; animation: fadeIn 0.5s ease; flex-direction: column; align-items: center; }
+        .section-content.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .content-card { background-color: var(--panel-bg); border: 1px solid #222; border-radius: 8px; padding: 30px; width: 100%; max-width: 800px; text-align: center; position: relative; }
+        
+        /* GRID DE ITEMS */
+        .grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; width: 100%; margin-top: 20px; }
+        .grid-item { border: 1px solid #333; border-radius: 4px; padding: 15px; display: flex; flex-direction: column; align-items: center; background: #0a0a0a; cursor: pointer; transition: transform 0.2s, border-color 0.2s; position: relative;}
+        .grid-item:hover { transform: translateY(-5px); border-color: var(--text-gold); }
+        .grid-item-img { width: 100%; height: 200px; background-size: cover; background-position: center; border-radius: 4px; margin-bottom: 15px; background-color: #1a1a1a; }
+        .item-stars-avg { font-size: 13px; color: var(--text-gold); font-weight: 600; margin-top: 5px; }
+        .item-price { font-size: 14px; color: #27c93f; font-weight: bold; margin-top: 5px; letter-spacing: 1px;}
+        .del-btn { position: absolute; top: -10px; right: -10px; background: #ff4a4a; color: #fff; border: 2px solid #0a0a0a; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; display: none; font-weight: bold; z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .del-btn:hover { transform: scale(1.1); }
+
+        /* MODALES */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: var(--panel-bg); width: 90%; max-width: 800px; max-height: 90vh; border: 1px solid var(--text-gold); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .modal-content.small { max-width: 400px; border-color: #ff4a4a; }
+        .modal-close { position: absolute; top: 15px; right: 20px; color: #888; font-size: 24px; cursor: pointer; background: none; border: none; z-index: 10; }
+        .modal-body { display: flex; flex-wrap: wrap; overflow-y: auto; padding: 30px; gap: 30px; }
+        
+        .modal-left { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center;}
+        .modal-right { flex: 1; min-width: 300px; display: flex; flex-direction: column; }
+        .modal-img { width: 100%; height: 350px; background-size: cover; background-position: center; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;}
+        .modal-title { font-family: var(--font-serif); font-size: 24px; color: var(--text-gold); margin: 0 0 5px 0; text-align: center; }
+        
+        .star-rating { display: flex; flex-direction: row-reverse; justify-content: center; gap: 5px; margin-bottom: 15px; }
+        .star-rating input { display: none; }
+        .star-rating label { font-size: 25px; color: #444; cursor: pointer; transition: color 0.2s; }
+        .star-rating input:checked ~ label, .star-rating label:hover, .star-rating label:hover ~ label { color: var(--text-gold); }
+        .comments-list { flex-grow: 1; max-height: 250px; overflow-y: auto; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .comment-item { display: flex; gap: 10px; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; }
+        .comment-avatar { width: 35px; height: 35px; border-radius: 50%; background-size: cover; background-position: center; background-color: #222; flex-shrink: 0;}
+        .comment-text-area { display: flex; flex-direction: column; }
+        .comment-author { font-size: 12px; color: var(--text-gold); font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .comment-stars { color: var(--text-gold); font-size: 10px; margin: 2px 0; }
+        .comment-body { font-size: 13px; color: #ccc; margin-top: 3px; line-height: 1.4; }
+        .add-contact-link { cursor: pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px; background: rgba(198, 172, 113, 0.1); border: 1px solid rgba(198, 172, 113, 0.3); }
+        .add-contact-link:hover { background: var(--text-gold); color: #000; text-shadow: none; }
+
+        /* PERFIL Y CHAT */
+        .profile-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #333; width: 100%; max-width: 900px;}
+        .profile-avatar-large { width: 100px; height: 100px; border-radius: 50%; background-color: #222; background-size: cover; background-position: center; border: 2px solid var(--text-gold); margin-bottom: 15px; }
+        .profile-name { font-family: var(--font-serif); font-size: 24px; color: var(--text-gold); margin: 0 0 5px 0; }
+        .profile-role { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+        .profile-balance { font-size: 16px; color: #27c93f; font-weight: bold; border: 1px solid #27c93f; padding: 5px 15px; border-radius: 20px; margin-bottom: 15px; background: rgba(39, 201, 63, 0.1);}
+        .change-photo-label { font-size: 10px; color: #aaa; cursor: pointer; text-decoration: underline; text-transform: uppercase; letter-spacing: 1px;}
+        
+        .social-chat-container { display: flex; width: 100%; max-width: 900px; height: 500px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+        .chat-sidebar { width: 320px; background: #111; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .chat-sidebar-header { padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .contact-list { flex-grow: 1; overflow-y: auto; }
+        .contact-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #1a1a1a; cursor: pointer; }
+        .contact-item:hover, .contact-item.active { background: #161616; border-left: 3px solid var(--text-gold); }
+        .contact-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #222; background-size: cover; margin-right: 15px; }
+        
+        .chat-main { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        .chat-main-header { padding: 15px 25px; background: #111; border-bottom: 1px solid #333; display: flex; align-items: center; }
+        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg-bubble { max-width: 75%; padding: 12px 18px; border-radius: 8px; font-size: 13px; }
+        .msg-received { background: #161616; align-self: flex-start; border-left: 2px solid #555; color: #ccc; border-bottom-left-radius: 0; }
+        .msg-sent { background: #1a150c; align-self: flex-end; border-right: 2px solid var(--text-gold); color: var(--text-gold); border-bottom-right-radius: 0; }
+        .chat-input-area { display: flex; padding: 15px; background: #111; border-top: 1px solid #333; }
+        .chat-input-area .input-field { border-radius: 20px; padding: 12px 20px; }
+        .chat-send-btn { background: var(--text-gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .chat-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; }
+
+        .footer { margin-top: auto; padding: 40px 20px 20px 20px; width: 100%; display: flex; justify-content: space-between; box-sizing: border-box; font-size: 10px; color: #555; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div class="logo-container" id="main-logo">
+        <div class="logo-icon"><div class="logo-arch"></div><div class="logo-moon"></div></div>
+        <h1 class="site-title">NOIR</h1>
+        <div class="site-subtitle">Templo La Paz Sauce</div>
+    </div>
+
+    <div id="login-view">
+        <div class="card">
+            <h2>SANTUARIO PRIVADO</h2>
+            <div class="input-group">
+                <input type="password" id="access-code" class="input-field code-input" maxlength="4" placeholder="••••">
+            </div>
+            <div id="code-error" class="error-message">CÓDIGO INVÁLIDO.</div>
+            <button id="verify-btn" class="gold-button">INGRESAR</button>
+        </div>
+    </div>
+
+    <div id="dashboard-view">
+        <nav class="nav-menu">
+            <button class="nav-btn active" data-target="sec-evento">Evento</button>
+            <button class="nav-btn" data-target="sec-modelos">Modelos</button>
+            <button class="nav-btn" data-target="sec-mercancia">Mercancía</button>
+            <button class="nav-btn" data-target="sec-juguetes">Juguetes</button>
+            <button class="nav-btn" data-target="sec-perfil">Perfil</button>
+            <button class="nav-btn admin-only-block" style="display: none;" data-target="sec-admin">Crear Accesos</button>
+            <button class="nav-btn" id="logout-btn" style="color:#ff4a4a;">Salir</button>
+        </nav>
+
+        <div id="sec-evento" class="section-content active">
+            <div class="content-card" id="event-display-mode">
+                <h2 id="ev-titulo" style="font-family: var(--font-serif); color: var(--text-gold); font-size: 24px; text-transform: uppercase;">CARGANDO...</h2>
+                <p id="ev-fecha" style="font-size: 30px; margin: 10px 0;"></p>
+                <p id="ev-hora" style="font-size: 18px; color: var(--text-gold);"></p>
+                <hr style="border-color: #222; margin: 30px 0;">
+                <p id="ev-desc" style="font-size: 12px; color: #888;"></p>
+                <button id="btn-edit-event" class="gold-button admin-inline-btn admin-only-block">EDITAR INFORMACIÓN DEL EVENTO</button>
+            </div>
+            <div class="content-card" id="event-edit-mode" style="display: none; border-color: #ff4a4a;">
+                <h2 style="font-family: var(--font-serif); color: #ff4a4a; margin-bottom: 20px;">MODO EDICIÓN (ADMIN)</h2>
+                <div class="input-group"><label class="input-label">Título</label><input type="text" id="adm-ev-titulo" class="input-field"></div>
+                <div class="input-group"><label class="input-label">Fecha</label><input type="text" id="adm-ev-fecha" class="input-field"></div>
+                <div class="input-group"><label class="input-label">Hora</label><input type="text" id="adm-ev-hora" class="input-field"></div>
+                <div class="input-group"><label class="input-label">Descripción</label><textarea id="adm-ev-desc" class="input-field"></textarea></div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="update-event-btn" class="gold-button admin-inline-btn" style="margin-top:0;">GUARDAR CAMBIOS</button>
+                    <button id="cancel-event-btn" class="gold-button" style="margin-top:0; border-color:#555; color:#888;">CANCELAR</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sec-modelos" class="section-content">
+            <h2 style="font-family: var(--font-serif); color: var(--text-gold);">CATÁLOGO DE MODELOS</h2>
+            <button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('modelos')">+ AÑADIR NUEVA MODELO</button>
+            <div class="grid-layout" id="grid-modelos"></div>
+        </div>
+
+        <div id="sec-mercancia" class="section-content">
+            <h2 style="font-family: var(--font-serif); color: var(--text-gold);">BOUTIQUE NOIR</h2>
+            <button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('mercancia')">+ AÑADIR NUEVA MERCANCÍA</button>
+            <div class="grid-layout" id="grid-mercancia"></div>
+        </div>
+
+        <div id="sec-juguetes" class="section-content">
+            <h2 style="font-family: var(--font-serif); color: var(--text-gold);">COLECCIÓN PRIVADA</h2>
+            <button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('juguetes')">+ AÑADIR NUEVO JUGUETE</button>
+            <div class="grid-layout" id="grid-juguetes"></div>
+        </div>
+
+        <div id="sec-perfil" class="section-content">
+            <div class="profile-header">
+                <div class="profile-avatar-large" id="my-profile-pic"></div>
+                <h2 class="profile-name" id="my-profile-name">Cargando...</h2>
+                <p class="profile-role" id="my-profile-role">Miembro</p>
+                <p class="profile-balance" id="my-profile-balance">FONDOS: $0.00</p>
+                <input type="file" id="update-photo-input" accept="image/*">
+                <label for="update-photo-input" class="change-photo-label" id="change-photo-label-text">Actualizar Fotografía</label>
+            </div>
+            
+            <h3 style="font-family: var(--font-serif); color: var(--text-gold); align-self: flex-start; margin-left: 5%;">RED PRIVADA</h3>
+            <div class="social-chat-container">
+                <div class="chat-sidebar">
+                    <div class="chat-sidebar-header">
+                        <h3 style="font-family: var(--font-serif); color: var(--text-gold); margin: 0;">Contactos</h3>
+                        <div>
+                            <button id="add-contact-btn" style="background:none; border:none; color:var(--text-gold); cursor:pointer; font-size: 20px; font-weight: bold;">+</button>
+                            <button id="refresh-chat-btn" style="background:none; border:none; color:#888; cursor:pointer;">↻</button>
+                        </div>
+                    </div>
+                    <div class="contact-list" id="contact-list-container"></div>
+                </div>
+                <div class="chat-main">
+                    <div class="chat-main-header">
+                        <div class="active-chat-avatar" id="active-chat-avatar"></div>
+                        <div class="active-chat-info">
+                            <h3 id="active-chat-name"></h3>
+                            <p id="active-chat-status" style="display:none;">Encriptado &bull; En línea</p>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chat-box"><div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Selecciona un contacto.</div></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" class="input-field" placeholder="Escribe un mensaje..." disabled>
+                        <button id="send-msg-btn" class="chat-send-btn" disabled>></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sec-admin" class="section-content">
+            
+            <div class="content-card" style="border-color: #27c93f; margin-bottom: 20px;">
+                <h2 style="font-family: var(--font-serif); color: #27c93f; margin-bottom: 20px;">TESORERÍA: INYECTAR FONDOS</h2>
+                <p style="font-size: 11px; color:#888;">Agrega saldo a la cuenta de un miembro usando su PIN.</p>
+                <div class="input-group"><input type="text" id="adm-fondos-pin" class="input-field code-input" maxlength="4" placeholder="PIN DEL USUARIO"></div>
+                <div class="input-group"><input type="number" id="adm-fondos-monto" class="input-field" placeholder="Monto a sumar (Ej. 150.00)"></div>
+                <button id="add-fondos-btn" class="gold-button admin-inline-btn" style="margin-top:0; border-color: #27c93f; color: #27c93f;">ACREDITAR SALDO</button>
+            </div>
+
+            <div class="content-card" style="border-color: #ff4a4a;">
+                <h2 style="font-family: var(--font-serif); color: #ff4a4a; margin-bottom: 20px;">GENERAR NUEVO ACCESO</h2>
+                <div class="input-group"><input type="text" id="new-user-name" class="input-field" placeholder="Alias"></div>
+                <div class="input-group">
+                    <select id="new-user-sex" class="input-field">
+                        <option value="Femenino">Femenino</option><option value="Masculino">Masculino</option><option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="new-user-photo" class="file-upload-btn" id="upload-label">+ Seleccionar Imagen (Opcional)</label>
+                    <input type="file" id="new-user-photo" accept="image/*">
+                </div>
+                <div class="input-group"><input type="text" id="new-user-code" class="input-field code-input" maxlength="4" placeholder="PIN (4 digitos)"></div>
+                <button id="create-user-btn" class="gold-button admin-inline-btn" style="margin-top:0;">CREAR USUARIO</button>
+                <div id="admin-status" style="margin-top: 15px; font-size: 12px; display: none;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="close-modal">✕</button>
+            <div class="modal-body">
+                <div class="modal-left">
+                    <div class="modal-img" id="modal-img"></div>
+                    <h2 class="modal-title" id="modal-title">Nombre</h2>
+                    <p id="modal-price" style="color: #27c93f; font-size: 22px; font-weight: bold; margin: -5px 0 15px 0; display: none;">$0.00</p>
+                    <button id="buy-item-btn" class="gold-button" style="display:none; margin-bottom: 20px; background-color: #1a150c;">ADQUIRIR PRODUCTO</button>
+                </div>
+                <div class="modal-right">
+                    <h3 style="font-family:var(--font-serif); color:var(--text-gold); margin:0 0 10px 0;">Valoraciones</h3>
+                    <div class="comments-list" id="modal-comments"></div>
+                    
+                    <div id="review-form-container" style="background:#111; padding:15px; border-radius:4px; border:1px solid #333;">
+                        <div class="star-rating">
+                            <input type="radio" id="star5" name="rating" value="5"><label for="star5">★</label>
+                            <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
+                            <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
+                            <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
+                            <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
+                        </div>
+                        <textarea id="my-comment-text" class="input-field" placeholder="Añadir una valoración..." rows="2"></textarea>
+                        <button id="submit-review-btn" class="gold-button" style="padding: 10px; margin-top:10px;">PUBLICAR</button>
+                    </div>
+                    
+                    <div id="already-reviewed-msg" style="display:none; text-align:center; color:var(--text-gold); font-size:12px; padding:15px; border:1px solid #333; border-radius:4px; background:#111;">
+                        Ya has dejado tu valoración para este elemento.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="add-item-modal">
+        <div class="modal-content small" style="padding: 30px;">
+            <button class="modal-close" id="close-add-modal">✕</button>
+            <h2 style="font-family: var(--font-serif); color: #ff4a4a; text-align: center; margin-top:0;">AÑADIR A <span id="add-item-cat-label" style="text-transform: uppercase;"></span></h2>
+            
+            <div class="input-group"><input type="text" id="adm-item-nombre" class="input-field" placeholder="Nombre / Descripción corta"></div>
+            <div class="input-group"><input type="number" id="adm-item-precio" class="input-field" placeholder="Precio ($) - Deja en 0 para Modelos"></div>
+            
+            <div class="input-group">
+                <label for="adm-item-foto" class="file-upload-btn" id="lbl-item-foto">+ Subir Fotografía (Requerido)</label>
+                <input type="file" id="adm-item-foto" accept="image/*">
+            </div>
+            <button id="confirm-add-item-btn" class="gold-button admin-inline-btn" style="margin-top: 10px;">GUARDAR EN CATÁLOGO</button>
+        </div>
+    </div>
+
+    <div class="footer"><div>Templo La Paz Sauce</div><div>0069518296</div></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+           const API_URL = '/api';
+            let currentUser = null; 
+            let activeItemModalId = null;
+            let currentCategoryToAdd = '';
+            
+            const antiCache = () => `?t=${new Date().getTime()}`;
+
+            // --- FUNCIÓN ACTUALIZAR UI SALDO ---
+            function actualizarSaldoUI(nuevoSaldo) {
+                currentUser.saldo = nuevoSaldo;
+                document.getElementById('my-profile-balance').innerText = `FONDOS: $${parseFloat(nuevoSaldo).toFixed(2)}`;
+            }
+
+            // --- LOGIN ---
+            async function handleLogin() {
+                const code = document.getElementById('access-code').value;
+                if (!code) return;
+                try {
+                    const res = await fetch(`${API_URL}/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: code}) });
+                    const data = await res.json();
+                    if (data.success) {
+                        currentUser = data.user;
+                        document.getElementById('code-error').style.display = 'none';
+                        
+                        document.getElementById('my-profile-name').innerText = currentUser.nombre;
+                        document.getElementById('my-profile-role').innerText = currentUser.rol === 'admin' ? 'Maestro del Santuario' : 'Miembro';
+                        if(currentUser.foto) document.getElementById('my-profile-pic').style.backgroundImage = `url(${currentUser.foto})`;
+                        
+                        actualizarSaldoUI(currentUser.saldo);
+
+                        const isAdmin = currentUser.rol === 'admin';
+                        document.querySelectorAll('.admin-only-block').forEach(el => { el.style.display = isAdmin ? 'block' : 'none'; });
+
+                        document.getElementById('login-view').style.opacity = '0';
+                        setTimeout(() => {
+                            document.getElementById('login-view').style.display = 'none';
+                            document.getElementById('dashboard-view').style.display = 'flex';
+                            setTimeout(() => document.getElementById('dashboard-view').style.opacity = '1', 50);
+                        }, 400);
+
+                        cargarEvento(); cargarItems('modelos'); cargarItems('mercancia'); cargarItems('juguetes');
+                        switchTab('sec-evento');
+                    } else {
+                        document.getElementById('code-error').innerText = data.message; document.getElementById('code-error').style.display = 'block';
+                    }
+                } catch (err) { alert("Error conectando al servidor."); }
+            }
+            document.getElementById('verify-btn').addEventListener('click', handleLogin);
+            document.getElementById('access-code').addEventListener('keypress', (e) => { if(e.key==='Enter') handleLogin(); });
+            document.getElementById('logout-btn').addEventListener('click', () => location.reload());
+
+            // --- NAVEGACIÓN ---
+            function switchTab(targetId) {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+                document.querySelector(`.nav-btn[data-target="${targetId}"]`).classList.add('active');
+                document.getElementById(targetId).classList.add('active');
+                if(targetId === 'sec-perfil') cargarContactos();
+            }
+            document.querySelectorAll('.nav-btn[data-target]').forEach(btn => btn.addEventListener('click', (e) => switchTab(e.target.getAttribute('data-target'))));
+
+            // --- EVENTO ---
+            async function cargarEvento() {
+                const res = await fetch(`${API_URL}/evento${antiCache()}`);
+                const ev = await res.json();
+                document.getElementById('ev-titulo').innerText = ev.titulo; document.getElementById('ev-fecha').innerText = ev.fecha;
+                document.getElementById('ev-hora').innerText = ev.hora; document.getElementById('ev-desc').innerText = ev.descripcion;
+                document.getElementById('adm-ev-titulo').value = ev.titulo; document.getElementById('adm-ev-fecha').value = ev.fecha;
+                document.getElementById('adm-ev-hora').value = ev.hora; document.getElementById('adm-ev-desc').value = ev.descripcion;
+            }
+            document.getElementById('btn-edit-event').addEventListener('click', () => { document.getElementById('event-display-mode').style.display = 'none'; document.getElementById('event-edit-mode').style.display = 'block'; });
+            document.getElementById('cancel-event-btn').addEventListener('click', () => { document.getElementById('event-edit-mode').style.display = 'none'; document.getElementById('event-display-mode').style.display = 'block'; });
+            document.getElementById('update-event-btn').addEventListener('click', async () => {
+                const body = { adminCode: currentUser.codigo, titulo: document.getElementById('adm-ev-titulo').value, fecha: document.getElementById('adm-ev-fecha').value, hora: document.getElementById('adm-ev-hora').value, descripcion: document.getElementById('adm-ev-desc').value };
+                await fetch(`${API_URL}/evento`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                document.getElementById('event-edit-mode').style.display = 'none'; document.getElementById('event-display-mode').style.display = 'block'; cargarEvento(); 
+            });
+
+            // --- CATÁLOGOS CON PRECIOS ---
+            async function cargarItems(categoria) {
+                const res = await fetch(`${API_URL}/items/${categoria}${antiCache()}`);
+                const items = await res.json();
+                const container = document.getElementById(`grid-${categoria}`); container.innerHTML = '';
+                
+                items.forEach(item => {
+                    const div = document.createElement('div'); div.className = 'grid-item';
+                    const delBtnHTML = (currentUser.rol === 'admin') ? `<button class="del-btn admin-only-block" style="display:block;" onclick="borrarItem(${item.id}, '${categoria}', event)">X</button>` : '';
+                    
+                    const totalVotos = parseInt(item.total_resenas) || 0;
+                    const promedio = parseFloat(item.promedio_estrellas) || 0;
+                    const starText = totalVotos > 0 ? `★ ${promedio.toFixed(1)} (${totalVotos})` : `Sin valoraciones`;
+                    
+                    const precio = parseFloat(item.precio);
+                    const precioText = precio > 0 ? `<p class="item-price">$${precio.toFixed(2)}</p>` : '';
+
+                    div.innerHTML = `
+                        ${delBtnHTML}
+                        <div class="grid-item-img" style="background-image: url(${item.imagen})"></div>
+                        <h3 style="margin:0; font-size:14px; color:var(--text-gold); text-align:center;">${item.nombre}</h3>
+                        ${precioText}
+                        <p class="item-stars-avg">${starText}</p>
+                    `;
+                    div.addEventListener('click', () => abrirModalItem(item, categoria));
+                    container.appendChild(div);
+                });
+            }
+            window.borrarItem = async function(id, categoria, event) {
+                event.stopPropagation();
+                if(confirm("¿Eliminar registro permanentemente?")) { await fetch(`${API_URL}/items/${id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({adminCode: currentUser.codigo})}); cargarItems(categoria); }
+            }
+
+            // Añadir Item (Ahora con precio)
+            window.abrirModalAgregar = function(categoria) { currentCategoryToAdd = categoria; document.getElementById('add-item-cat-label').innerText = categoria; document.getElementById('add-item-modal').style.display = 'flex'; }
+            document.getElementById('close-add-modal').addEventListener('click', () => document.getElementById('add-item-modal').style.display = 'none');
+
+            let base64NewItem = null; const lblItemFoto = document.getElementById('lbl-item-foto');
+            document.getElementById('adm-item-foto').addEventListener('change', e => {
+                const file = e.target.files[0]; if(file) { lblItemFoto.innerText = "✓ Foto Cargada"; lblItemFoto.style.borderColor = "#27c93f"; const reader = new FileReader(); reader.onloadend = () => base64NewItem = reader.result; reader.readAsDataURL(file); }
+            });
+            document.getElementById('confirm-add-item-btn').addEventListener('click', async () => {
+                const nombre = document.getElementById('adm-item-nombre').value;
+                const precio = document.getElementById('adm-item-precio').value || 0;
+                if(!nombre || !base64NewItem) return alert("Se requiere nombre e imagen.");
+                
+                document.getElementById('confirm-add-item-btn').innerText = "GUARDANDO...";
+                await fetch(`${API_URL}/items`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminCode: currentUser.codigo, categoria: currentCategoryToAdd, nombre: nombre, imagen: base64NewItem, precio: precio }) });
+                
+                document.getElementById('adm-item-nombre').value = ''; document.getElementById('adm-item-precio').value = ''; 
+                lblItemFoto.innerText = "+ Subir Fotografía (Requerido)"; lblItemFoto.style.borderColor = "#555"; base64NewItem = null;
+                document.getElementById('confirm-add-item-btn').innerText = "GUARDAR EN CATÁLOGO"; document.getElementById('add-item-modal').style.display = 'none'; cargarItems(currentCategoryToAdd); 
+            });
+
+
+            // --- COMPRAR DESDE MODAL ---
+            const modalDetalle = document.getElementById('item-modal');
+            let itemCategoryRef = ''; 
+            document.getElementById('close-modal').addEventListener('click', () => modalDetalle.style.display = 'none');
+            
+            async function abrirModalItem(item, categoria) {
+                activeItemModalId = item.id;
+                itemCategoryRef = categoria;
+                document.getElementById('modal-title').innerText = item.nombre;
+                document.getElementById('modal-img').style.backgroundImage = `url(${item.imagen})`;
+                
+                // Mostrar precio y botón comprar si aplica
+                const precioElem = document.getElementById('modal-price');
+                const btnComprar = document.getElementById('buy-item-btn');
+                const precio = parseFloat(item.precio);
+                
+                if(precio > 0) {
+                    precioElem.innerText = `$${precio.toFixed(2)}`;
+                    precioElem.style.display = 'block';
+                    btnComprar.style.display = 'block';
+                } else {
+                    precioElem.style.display = 'none';
+                    btnComprar.style.display = 'none';
+                }
+
+                document.getElementById('my-comment-text').value = '';
+                document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
+                cargarResenas(item.id);
+                modalDetalle.style.display = 'flex';
+            }
+
+            document.getElementById('buy-item-btn').addEventListener('click', async () => {
+                if(!confirm(`¿Deseas adquirir este producto? Se descontará de tus fondos.`)) return;
+                
+                try {
+                    const res = await fetch(`${API_URL}/comprar`, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ codigoUsuario: currentUser.codigo, itemId: activeItemModalId })
+                    });
+                    const data = await res.json();
+                    if(res.ok) {
+                        alert(data.message);
+                        actualizarSaldoUI(data.nuevoSaldo);
+                        modalDetalle.style.display = 'none';
+                    } else {
+                        alert(data.error); // Ej. "Fondos insuficientes"
+                    }
+                } catch(e) { alert("Error procesando compra."); }
+            });
+
+            // Reseñas...
+            async function cargarResenas(itemId) {
+                const res = await fetch(`${API_URL}/items/${itemId}/resenas${antiCache()}`);
+                const reviews = await res.json();
+                const container = document.getElementById('modal-comments'); container.innerHTML = '';
+                let userAlreadyReviewed = false;
+
+                if(reviews.length === 0) {
+                    container.innerHTML = '<p style="color:#555; text-align:center; font-size:12px; margin-top:20px;">Sin valoraciones aún.</p>';
+                } else {
+                    reviews.forEach(r => {
+                        if(r.usuario_codigo === currentUser.codigo) userAlreadyReviewed = true;
+                        let starsHtml = ''; for(let i=0; i<r.estrellas; i++) starsHtml += '★'; for(let i=r.estrellas; i<5; i++) starsHtml += '☆';
+                        const bg = r.foto ? `url(${r.foto})` : 'none';
+                        const nombreSeguro = r.nombre.replace(/'/g, "\\'"); 
+                        
+                        container.innerHTML += `
+                            <div class="comment-item">
+                                <div class="comment-avatar" style="background-image: ${bg}"></div>
+                                <div class="comment-text-area">
+                                    <span class="comment-author">${r.nombre} <span class="add-contact-link" onclick="agregarDesdeComentario('${nombreSeguro}')" title="Agregar a mi Red">✛ Agregar</span></span>
+                                    <span class="comment-stars">${starsHtml}</span>
+                                    <span class="comment-body">${r.comentario}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                if (userAlreadyReviewed) { document.getElementById('review-form-container').style.display = 'none'; document.getElementById('already-reviewed-msg').style.display = 'block'; } else { document.getElementById('review-form-container').style.display = 'block'; document.getElementById('already-reviewed-msg').style.display = 'none'; }
+            }
+
+            document.getElementById('submit-review-btn').addEventListener('click', async () => {
+                const texto = document.getElementById('my-comment-text').value;
+                const starChecked = document.querySelector('input[name="rating"]:checked');
+                if(!starChecked) return alert("Por favor, selecciona una calificación.");
+                
+                const res = await fetch(`${API_URL}/items/${activeItemModalId}/resenas`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ usuario_codigo: currentUser.codigo, estrellas: parseInt(starChecked.value), comentario: texto }) });
+                const data = await res.json();
+                if (res.ok) { cargarResenas(activeItemModalId); cargarItems(itemCategoryRef); } else { alert(data.error); }
+            });
+
+            // --- ADMIN: AÑADIR FONDOS ---
+            document.getElementById('add-fondos-btn').addEventListener('click', async () => {
+                const targetPin = document.getElementById('adm-fondos-pin').value;
+                const monto = document.getElementById('adm-fondos-monto').value;
+                if(targetPin.length !== 4 || !monto) return alert("Ingresa el PIN de 4 dígitos y el monto.");
+
+                try {
+                    const res = await fetch(`${API_URL}/admin/fondos`, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ adminCode: currentUser.codigo, targetPin: targetPin, monto: monto })
+                    });
+                    const data = await res.json();
+                    if(res.ok) {
+                        alert(data.message);
+                        document.getElementById('adm-fondos-pin').value = '';
+                        document.getElementById('adm-fondos-monto').value = '';
+                        // Si el admin se inyectó fondos a sí mismo, actualizar su pantalla
+                        if(targetPin === currentUser.codigo) actualizarSaldoUI(parseFloat(currentUser.saldo) + parseFloat(monto));
+                    } else {
+                        alert(data.error);
+                    }
+                } catch(e) { alert("Error de red."); }
+            });
+
+            // --- OTRAS FUNCIONES (Foto, Chat, Crear Usuario) ---
+            window.agregarDesdeComentario = async function(aliasAutor) {
+                if(aliasAutor === currentUser.nombre) return alert("No puedes agregarte a ti mismo a tu red.");
+                if(confirm(`¿Deseas agregar a "${aliasAutor}" a tu red privada de contactos?`)) {
+                    try {
+                        const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miCodigo: currentUser.codigo, aliasContacto: aliasAutor }) });
+                        const data = await res.json(); alert(data.message || data.error);
+                    } catch(e) { alert("Error de conexión."); }
+                }
+            };
+
+            document.getElementById('update-photo-input').addEventListener('change', e => {
+                const file = e.target.files[0];
+                if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
+            });
+
+            let activeChatCode = null;
+            document.getElementById('add-contact-btn').addEventListener('click', async () => {
+                const alias = prompt("Ingresa el ALIAS del usuario a conectar:");
+                if(!alias) return;
+                const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({miCodigo: currentUser.codigo, aliasContacto: alias}) });
+                const data = await res.json(); alert(data.message || data.error); cargarContactos();
+            });
+
+            async function cargarContactos() {
+                const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
+                const contactos = await res.json();
+                const container = document.getElementById('contact-list-container'); container.innerHTML = '';
+                contactos.forEach(u => {
+                    const div = document.createElement('div'); div.className = 'contact-item';
+                    const bg = u.foto ? `url(${u.foto})` : 'none';
+                    div.innerHTML = `<div class="contact-avatar" style="background-image:${bg}"></div><div class="contact-info"><div class="contact-name">${u.nombre}</div><div class="contact-status">${u.sexo}</div></div>`;
+                    div.addEventListener('click', () => {
+                        activeChatCode = u.codigo; document.getElementById('active-chat-name').innerText = u.nombre;
+                        document.getElementById('active-chat-avatar').style.backgroundImage = bg; document.getElementById('active-chat-avatar').style.display='block';
+                        document.getElementById('active-chat-status').style.display='block'; cargarMensajes();
+                    });
+                    container.appendChild(div);
+                });
+            }
+
+            async function cargarMensajes() {
+                if(!activeChatCode) return;
+                document.getElementById('chat-input').disabled = false; document.getElementById('send-msg-btn').disabled = false; document.getElementById('chat-placeholder').style.display = 'none';
+                const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
+                const msgs = await res.json();
+                const box = document.getElementById('chat-box'); box.innerHTML = '';
+                msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
+                box.scrollTop = box.scrollHeight;
+            }
+
+            async function enviarMensaje() {
+                const text = document.getElementById('chat-input').value;
+                if(!text || !activeChatCode) return;
+                await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
+                document.getElementById('chat-input').value = ''; cargarMensajes();
+            }
+            document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
+            document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
+            document.getElementById('refresh-chat-btn').addEventListener('click', () => { cargarContactos(); cargarMensajes(); });
+
+            let base64NewUser = null;
+            document.getElementById('new-user-photo').addEventListener('change', e => {
+                const f = e.target.files[0]; if(f) { document.getElementById('upload-label').innerText = "✓ Lista"; const r = new FileReader(); r.onloadend = () => base64NewUser = r.result; r.readAsDataURL(f); }
+            });
+            document.getElementById('create-user-btn').addEventListener('click', async () => {
+                const name = document.getElementById('new-user-name').value;
+                const sex = document.getElementById('new-user-sex').value;
+                const code = document.getElementById('new-user-code').value;
+                if(code.length === 4 && name) {
+                    const res = await fetch(`${API_URL}/usuarios`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: code, nombre: name, sexo: sex, foto: base64NewUser, adminCode: currentUser.codigo}) });
+                    if(res.ok) { alert("Usuario creado"); document.getElementById('new-user-name').value = ''; document.getElementById('new-user-code').value = ''; base64NewUser = null; document.getElementById('upload-label').innerText = "+ Seleccionar Imagen (Opcional)"; } else alert("Error o PIN repetido");
+                } else alert("Llena Nombre y PIN");
+            });
+        });
+    </script>
+</body>
+</html>
