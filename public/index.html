@@ -32,7 +32,7 @@
         .input-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #888; margin-bottom: 8px; }
         .input-field, select.input-field, textarea.input-field { width: 100%; padding: 12px 15px; background-color: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: var(--text-gold); font-size: 14px; font-family: var(--font-sans); box-sizing: border-box; }
         .input-field:focus { outline: none; border-color: var(--input-border); }
-        .code-input { text-align: center; font-size: 20px; letter-spacing: 15px; padding-left: 30px; }
+        .code-input { text-align: center; font-size: 20px; letter-spacing: 10px; }
         .error-message { color: #ff4a4a; font-size: 11px; margin-top: -10px; margin-bottom: 15px; display: none; }
         input[type="file"] { display: none; }
         .file-upload-btn { display: inline-block; width: 100%; padding: 10px; background-color: #1a1a1a; border: 1px dashed #555; color: #888; text-align: center; border-radius: 4px; cursor: pointer; font-size: 12px; box-sizing: border-box; transition: border-color 0.3s; }
@@ -134,7 +134,7 @@
         <div class="card">
             <h2>SANTUARIO PRIVADO</h2>
             <div class="input-group">
-                <input type="password" id="access-code" class="input-field code-input" maxlength="4" placeholder="••••">
+                <input type="password" id="access-code" class="input-field code-input" maxlength="20" placeholder="••••">
             </div>
             <div id="code-error" class="error-message">CÓDIGO INVÁLIDO.</div>
             <button id="verify-btn" class="gold-button">INGRESAR</button>
@@ -235,8 +235,8 @@
             
             <div class="content-card" style="border-color: #27c93f; margin-bottom: 20px;">
                 <h2 style="font-family: var(--font-serif); color: #27c93f; margin-bottom: 20px;">TESORERÍA: INYECTAR FONDOS</h2>
-                <p style="font-size: 11px; color:#888;">Agrega saldo a la cuenta de un miembro usando su PIN.</p>
-                <div class="input-group"><input type="text" id="adm-fondos-pin" class="input-field code-input" maxlength="4" placeholder="PIN DEL USUARIO"></div>
+                <p style="font-size: 11px; color:#888;">Agrega saldo a la cuenta de un miembro usando su PIN/Contraseña.</p>
+                <div class="input-group"><input type="text" id="adm-fondos-pin" class="input-field code-input" maxlength="20" placeholder="PIN/Contraseña del usuario"></div>
                 <div class="input-group"><input type="number" id="adm-fondos-monto" class="input-field" placeholder="Monto a sumar (Ej. 150.00)"></div>
                 <button id="add-fondos-btn" class="gold-button admin-inline-btn" style="margin-top:0; border-color: #27c93f; color: #27c93f;">ACREDITAR SALDO</button>
             </div>
@@ -253,7 +253,7 @@
                     <label for="new-user-photo" class="file-upload-btn" id="upload-label">+ Seleccionar Imagen (Opcional)</label>
                     <input type="file" id="new-user-photo" accept="image/*">
                 </div>
-                <div class="input-group"><input type="text" id="new-user-code" class="input-field code-input" maxlength="4" placeholder="PIN (4 digitos)"></div>
+                <div class="input-group"><input type="text" id="new-user-code" class="input-field code-input" maxlength="20" placeholder="PIN o Contraseña"></div>
                 <button id="create-user-btn" class="gold-button admin-inline-btn" style="margin-top:0;">CREAR USUARIO</button>
                 <div id="admin-status" style="margin-top: 15px; font-size: 12px; display: none;"></div>
             </div>
@@ -311,11 +311,13 @@
         </div>
     </div>
 
-    <div class="footer"><div>Templo La Paz Sauce</div><div>0069518296</div></div>
+    <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO</div></div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-           const API_URL = '/api';
+            // RUTA CORRECTA PARA RENDER (Carga desde el mismo servidor)
+            const API_URL = '/api'; 
+            
             let currentUser = null; 
             let activeItemModalId = null;
             let currentCategoryToAdd = '';
@@ -426,7 +428,6 @@
                 if(confirm("¿Eliminar registro permanentemente?")) { await fetch(`${API_URL}/items/${id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({adminCode: currentUser.codigo})}); cargarItems(categoria); }
             }
 
-            // Añadir Item (Ahora con precio)
             window.abrirModalAgregar = function(categoria) { currentCategoryToAdd = categoria; document.getElementById('add-item-cat-label').innerText = categoria; document.getElementById('add-item-modal').style.display = 'flex'; }
             document.getElementById('close-add-modal').addEventListener('click', () => document.getElementById('add-item-modal').style.display = 'none');
 
@@ -459,7 +460,6 @@
                 document.getElementById('modal-title').innerText = item.nombre;
                 document.getElementById('modal-img').style.backgroundImage = `url(${item.imagen})`;
                 
-                // Mostrar precio y botón comprar si aplica
                 const precioElem = document.getElementById('modal-price');
                 const btnComprar = document.getElementById('buy-item-btn');
                 const precio = parseFloat(item.precio);
@@ -481,7 +481,6 @@
 
             document.getElementById('buy-item-btn').addEventListener('click', async () => {
                 if(!confirm(`¿Deseas adquirir este producto? Se descontará de tus fondos.`)) return;
-                
                 try {
                     const res = await fetch(`${API_URL}/comprar`, {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -489,16 +488,12 @@
                     });
                     const data = await res.json();
                     if(res.ok) {
-                        alert(data.message);
-                        actualizarSaldoUI(data.nuevoSaldo);
-                        modalDetalle.style.display = 'none';
-                    } else {
-                        alert(data.error); // Ej. "Fondos insuficientes"
-                    }
+                        alert(data.message); actualizarSaldoUI(data.nuevoSaldo); modalDetalle.style.display = 'none';
+                    } else { alert(`Error: ${data.error}`); }
                 } catch(e) { alert("Error procesando compra."); }
             });
 
-            // Reseñas...
+            // --- RESEÑAS ---
             async function cargarResenas(itemId) {
                 const res = await fetch(`${API_URL}/items/${itemId}/resenas${antiCache()}`);
                 const reviews = await res.json();
@@ -543,7 +538,8 @@
             document.getElementById('add-fondos-btn').addEventListener('click', async () => {
                 const targetPin = document.getElementById('adm-fondos-pin').value;
                 const monto = document.getElementById('adm-fondos-monto').value;
-                if(targetPin.length !== 4 || !monto) return alert("Ingresa el PIN de 4 dígitos y el monto.");
+                
+                if(targetPin.length === 0 || !monto) return alert("Ingresa la Contraseña/PIN y el monto.");
 
                 try {
                     const res = await fetch(`${API_URL}/admin/fondos`, {
@@ -555,15 +551,14 @@
                         alert(data.message);
                         document.getElementById('adm-fondos-pin').value = '';
                         document.getElementById('adm-fondos-monto').value = '';
-                        // Si el admin se inyectó fondos a sí mismo, actualizar su pantalla
                         if(targetPin === currentUser.codigo) actualizarSaldoUI(parseFloat(currentUser.saldo) + parseFloat(monto));
                     } else {
-                        alert(data.error);
+                        alert(`Error: ${data.error}`);
                     }
                 } catch(e) { alert("Error de red."); }
             });
 
-            // --- OTRAS FUNCIONES (Foto, Chat, Crear Usuario) ---
+            // --- RED PRIVADA Y CHAT ---
             window.agregarDesdeComentario = async function(aliasAutor) {
                 if(aliasAutor === currentUser.nombre) return alert("No puedes agregarte a ti mismo a tu red.");
                 if(confirm(`¿Deseas agregar a "${aliasAutor}" a tu red privada de contactos?`)) {
@@ -624,18 +619,42 @@
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
             document.getElementById('refresh-chat-btn').addEventListener('click', () => { cargarContactos(); cargarMensajes(); });
 
+            // --- ADMIN: CREAR USUARIO ---
             let base64NewUser = null;
             document.getElementById('new-user-photo').addEventListener('change', e => {
                 const f = e.target.files[0]; if(f) { document.getElementById('upload-label').innerText = "✓ Lista"; const r = new FileReader(); r.onloadend = () => base64NewUser = r.result; r.readAsDataURL(f); }
             });
+            
             document.getElementById('create-user-btn').addEventListener('click', async () => {
                 const name = document.getElementById('new-user-name').value;
                 const sex = document.getElementById('new-user-sex').value;
                 const code = document.getElementById('new-user-code').value;
-                if(code.length === 4 && name) {
-                    const res = await fetch(`${API_URL}/usuarios`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: code, nombre: name, sexo: sex, foto: base64NewUser, adminCode: currentUser.codigo}) });
-                    if(res.ok) { alert("Usuario creado"); document.getElementById('new-user-name').value = ''; document.getElementById('new-user-code').value = ''; base64NewUser = null; document.getElementById('upload-label').innerText = "+ Seleccionar Imagen (Opcional)"; } else alert("Error o PIN repetido");
-                } else alert("Llena Nombre y PIN");
+                
+                if(code.length > 0 && code.length <= 20 && name) {
+                    try {
+                        const res = await fetch(`${API_URL}/usuarios`, { 
+                            method: 'POST', 
+                            headers: {'Content-Type': 'application/json'}, 
+                            body: JSON.stringify({codigo: code, nombre: name, sexo: sex, foto: base64NewUser, adminCode: currentUser.codigo}) 
+                        });
+                        
+                        const data = await res.json();
+                        
+                        if(res.ok) { 
+                            alert("Acceso creado exitosamente."); 
+                            document.getElementById('new-user-name').value = ''; 
+                            document.getElementById('new-user-code').value = ''; 
+                            base64NewUser = null; 
+                            document.getElementById('upload-label').innerText = "+ Seleccionar Imagen (Opcional)"; 
+                        } else {
+                            alert(`Error: ${data.error}`);
+                        }
+                    } catch(e) {
+                        alert("Error de red intentando conectar con el servidor.");
+                    }
+                } else {
+                    alert("Por favor llena el Nombre y una Contraseña (máximo 20 caracteres).");
+                }
             });
         });
     </script>
