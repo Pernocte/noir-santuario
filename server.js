@@ -1,214 +1,270 @@
 const express = require('express');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 const path = require('path');
+
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
+// Configuración básica y límite aumentado para aceptar fotos pesadas (Base64)
 app.use(cors());
-app.use(express.static('public'));
-app.use(express.json({ limit: '50mb' })); 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// 1. CONEXIÓN A MYSQL (AIVEN CLOUD)
+// ==========================================
 // CONEXIÓN A MYSQL (AIVEN CLOUD)
+// ==========================================
 const db = mysql.createPool({
     host: 'noir-db-solomau3-ac8e.l.aivencloud.com', 
     user: 'avnadmin',                               
-    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    
+    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    // <-- ¡NO OLVIDES CAMBIAR ESTO!
     port: 11158,                                    
     database: 'defaultdb',                          
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     ssl: {
-        rejectUnauthorized: false // ¡Clave para que Aiven te deje entrar!
+        rejectUnauthorized: false
     }
 });
 
-db.getConnection((err, connection) => {
-    if (err) console.error('Error MySQL:', err);
-    else { console.log('Santuario NOIR: Base de datos conectada.'); connection.release(); }
-});
+// ==========================================
+// RUTAS DE LA API (BACKEND)
+// ==========================================
 
-// --- USUARIOS Y PERFIL ---
-app.post('/api/login', (req, res) => {
+// 1. LOGIN
+app.post('/api/login', async (req, res) => {
     const { codigo } = req.body;
-    db.query('SELECT * FROM usuarios WHERE codigo = ?', [codigo], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error del servidor' });
-        if (results.length > 0) res.json({ success: true, user: results[0] });
-        else res.status(401).json({ success: false, message: 'Código inválido' });
-    });
+    if (!codigo) return res.status(400).json({ success: false, message: "Ingresa un código." });
+    try {
+        const [rows] = await db.query('SELECT id, codigo, nombre, rol, foto, saldo FROM usuarios WHERE codigo = ?', [codigo]);
+        if (rows.length > 0) {
+            res.json({ success: true, user: rows[0] });
+        } else {
+            res.status(401).json({ success: false, message: "Código inválido o usuario no existe." });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Error del servidor." });
+    }
 });
 
-app.post('/api/usuarios', (req, res) => {
-    const { codigo, nombre, sexo, foto, adminCode } = req.body;
-    db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode], (err, check) => {
-        if (err || check.length === 0 || check[0].rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
-        db.query('INSERT INTO usuarios (codigo, nombre, rol, sexo, foto, saldo) VALUES (?, ?, "user", ?, ?, 0.00)', [codigo, nombre, sexo, foto], (err) => {
-            if (err) {
-                if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Este PIN ya existe' });
-                return res.status(500).json({ error: 'Error BD' });
-            }
-            res.json({ success: true });
-        });
-    });
+// 2. CREAR NUEVO USUARIO (Liberado a 20 caracteres)
+app.post('/api/usuarios', async (req, res) => {
+    const { adminCode, codigo, nombre, sexo, foto } = req.body;
+    
+    if (!codigo || codigo.length > 20 || !nombre) {
+        return res.status(400).json({ error: "Faltan datos o contraseña muy larga (máximo 20 caracteres)." });
+    }
+
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') {
+            return res.status(403).json({ error: "No autorizado." });
+        }
+
+        const [existe] = await db.query('SELECT id FROM usuarios WHERE codigo = ?', [codigo]);
+        if (existe.length > 0) {
+            return res.status(400).json({ error: "Esa contraseña o PIN ya está en uso por otro miembro." });
+        }
+
+        await db.query('INSERT INTO usuarios (codigo, nombre, sexo, foto) VALUES (?, ?, ?, ?)', 
+            [codigo, nombre, sexo || 'No especificado', foto || null]
+        );
+        res.json({ message: "Usuario creado exitosamente" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error interno de la base de datos." });
+    }
 });
 
-app.post('/api/perfil/foto', (req, res) => {
-    const { codigo, nuevaFoto } = req.body;
-    db.query('UPDATE usuarios SET foto = ? WHERE codigo = ?', [nuevaFoto, codigo], (err) => {
-        if (err) return res.status(500).json({ error: 'Error al actualizar' });
-        res.json({ success: true });
-    });
+// 3. EVENTO
+app.get('/api/evento', async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM evento LIMIT 1');
+        if (rows.length > 0) res.json(rows[0]);
+        else res.json({ titulo: "Sin evento", fecha: "", hora: "", descripcion: "" });
+    } catch (err) { res.status(500).json({ error: "Error de servidor" }); }
 });
 
-// --- GESTIÓN DE SALDO (NUEVO) ---
-// Admin inyecta fondos
-app.post('/api/admin/fondos', (req, res) => {
-    const { adminCode, targetPin, monto } = req.body;
-    db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode], (err, check) => {
-        if (err || check.length === 0 || check[0].rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
+app.put('/api/evento', async (req, res) => {
+    const { adminCode, titulo, fecha, hora, descripcion } = req.body;
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
         
-        // Sumar el monto al saldo actual
-        db.query('UPDATE usuarios SET saldo = saldo + ? WHERE codigo = ?', [parseFloat(monto), targetPin], (err, results) => {
-            if (err) return res.status(500).json({ error: 'Error al transferir fondos' });
-            if (results.affectedRows === 0) return res.status(404).json({ error: 'PIN de usuario no encontrado' });
-            res.json({ success: true, message: `Se añadieron $${monto} al usuario.` });
-        });
-    });
+        await db.query('UPDATE evento SET titulo=?, fecha=?, hora=?, descripcion=? WHERE id=1', [titulo, fecha, hora, descripcion]);
+        res.json({ message: "Evento actualizado" });
+    } catch (err) { res.status(500).json({ error: "Error de servidor" }); }
 });
 
-// Usuario realiza una compra
-app.post('/api/comprar', (req, res) => {
-    const { codigoUsuario, itemId } = req.body;
-
-    // 1. Obtener precio del item y saldo del usuario
-    db.query('SELECT precio FROM items WHERE id = ?', [itemId], (err, itemRes) => {
-        if (err || itemRes.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
-        const precio = parseFloat(itemRes[0].precio);
-
-        db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [codigoUsuario], (err, userRes) => {
-            if (err || userRes.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
-            const saldoActual = parseFloat(userRes[0].saldo);
-
-            // 2. Verificar fondos
-            if (saldoActual < precio) {
-                return res.status(400).json({ error: 'Fondos insuficientes. Contacte al Administrador.' });
-            }
-
-            // 3. Descontar saldo
-            const nuevoSaldo = saldoActual - precio;
-            db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, codigoUsuario], (err) => {
-                if (err) return res.status(500).json({ error: 'Error al procesar pago' });
-                res.json({ success: true, message: 'Compra aprobada con éxito.', nuevoSaldo: nuevoSaldo });
-            });
-        });
-    });
+// 4. ITEMS (Catálogos)
+app.get('/api/items/:categoria', async (req, res) => {
+    try {
+        const query = `
+            SELECT i.*, COUNT(r.id) as total_resenas, AVG(r.estrellas) as promedio_estrellas 
+            FROM items i 
+            LEFT JOIN resenas r ON i.id = r.item_id 
+            WHERE i.categoria = ? 
+            GROUP BY i.id 
+            ORDER BY i.fecha_agregado DESC`;
+        const [rows] = await db.query(query, [req.params.categoria]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
 
-// --- EVENTO ---
-app.get('/api/evento', (req, res) => {
-    db.query('SELECT * FROM evento WHERE id = 1', (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error' });
-        res.json(results[0]);
-    });
+app.post('/api/items', async (req, res) => {
+    const { adminCode, categoria, nombre, imagen, precio } = req.body;
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
+        
+        await db.query('INSERT INTO items (categoria, nombre, imagen, precio) VALUES (?, ?, ?, ?)', [categoria, nombre, imagen, precio || 0]);
+        res.json({ message: "Item creado" });
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
 
-app.put('/api/evento', (req, res) => {
-    const { titulo, fecha, hora, descripcion, adminCode } = req.body;
-    db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode], (err, check) => {
-        if (err || check.length === 0 || check[0].rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
-        db.query('UPDATE evento SET titulo=?, fecha=?, hora=?, descripcion=? WHERE id=1', [titulo, fecha, hora, descripcion], (err) => {
-            if (err) return res.status(500).json({ error: 'Error al actualizar evento' });
-            res.json({ success: true });
-        });
-    });
-});
-
-// --- ITEMS ---
-app.get('/api/items/:categoria', (req, res) => {
-    const query = `
-        SELECT i.*, IFNULL(r_stats.promedio, 0) as promedio_estrellas, IFNULL(r_stats.total, 0) as total_resenas
-        FROM items i
-        LEFT JOIN ( SELECT item_id, AVG(estrellas) as promedio, COUNT(id) as total FROM resenas GROUP BY item_id ) r_stats ON i.id = r_stats.item_id
-        WHERE i.categoria = ? ORDER BY i.fecha_agregado DESC
-    `;
-    db.query(query, [req.params.categoria], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error' }); res.json(results);
-    });
-});
-
-app.post('/api/items', (req, res) => {
-    const { categoria, nombre, imagen, precio, adminCode } = req.body;
-    db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode], (err, check) => {
-        if (err || check.length === 0 || check[0].rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
-        db.query('INSERT INTO items (categoria, nombre, imagen, precio) VALUES (?, ?, ?, ?)', [categoria, nombre, imagen, parseFloat(precio)], (err) => {
-            if (err) return res.status(500).json({ error: 'Error al crear item' });
-            res.json({ success: true });
-        });
-    });
-});
-
-app.delete('/api/items/:id', (req, res) => {
+app.delete('/api/items/:id', async (req, res) => {
     const { adminCode } = req.body;
-    db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode], (err, check) => {
-        if (err || check.length === 0 || check[0].rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
-        db.query('DELETE FROM items WHERE id = ?', [req.params.id], (err) => {
-            if (err) return res.status(500).json({ error: 'Error' });
-            res.json({ success: true });
-        });
-    });
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
+        
+        await db.query('DELETE FROM items WHERE id = ?', [req.params.id]);
+        res.json({ message: "Item eliminado" });
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
 
-// --- RESEÑAS Y COMENTARIOS ---
-app.get('/api/items/:id/resenas', (req, res) => {
-    db.query('SELECT r.*, u.nombre, u.foto FROM resenas r JOIN usuarios u ON r.usuario_codigo = u.codigo WHERE r.item_id = ? ORDER BY r.fecha DESC', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error' }); res.json(results);
-    });
+// 5. COMPRAR ITEM
+app.post('/api/comprar', async (req, res) => {
+    const { codigoUsuario, itemId } = req.body;
+    try {
+        const [userRows] = await db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [codigoUsuario]);
+        const [itemRows] = await db.query('SELECT precio, nombre FROM items WHERE id = ?', [itemId]);
+        
+        if(userRows.length === 0 || itemRows.length === 0) return res.status(404).json({ error: "Usuario o item no encontrado" });
+        
+        const saldoActual = parseFloat(userRows[0].saldo);
+        const precioItem = parseFloat(itemRows[0].precio);
+        
+        if(saldoActual < precioItem) return res.status(400).json({ error: "Fondos insuficientes." });
+        
+        const nuevoSaldo = saldoActual - precioItem;
+        await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, codigoUsuario]);
+        
+        res.json({ message: `Compra exitosa: ${itemRows[0].nombre}`, nuevoSaldo: nuevoSaldo });
+    } catch (err) { res.status(500).json({ error: "Error procesando compra" }); }
 });
 
-app.post('/api/items/:id/resenas', (req, res) => {
+// 6. RESEÑAS
+app.get('/api/items/:id/resenas', async (req, res) => {
+    try {
+        const query = `
+            SELECT r.*, u.nombre, u.foto 
+            FROM resenas r 
+            JOIN usuarios u ON r.usuario_codigo = u.codigo 
+            WHERE r.item_id = ? ORDER BY r.fecha DESC`;
+        const [rows] = await db.query(query, [req.params.id]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+});
+
+app.post('/api/items/:id/resenas', async (req, res) => {
     const { usuario_codigo, estrellas, comentario } = req.body;
-    db.query('SELECT id FROM resenas WHERE item_id = ? AND usuario_codigo = ?', [req.params.id, usuario_codigo], (err, check) => {
-        if (err) return res.status(500).json({ error: 'Error servidor' });
-        if (check.length > 0) return res.status(400).json({ error: 'Ya has valorado este artículo.' });
-        db.query('INSERT INTO resenas (item_id, usuario_codigo, estrellas, comentario) VALUES (?, ?, ?, ?)', [req.params.id, usuario_codigo, estrellas, comentario], (err) => {
-            if (err) return res.status(500).json({ error: 'Error al comentar' }); res.json({ success: true });
-        });
-    });
+    const item_id = req.params.id;
+    try {
+        const [existe] = await db.query('SELECT id FROM resenas WHERE item_id = ? AND usuario_codigo = ?', [item_id, usuario_codigo]);
+        if(existe.length > 0) return res.status(400).json({ error: "Ya valoraste este elemento." });
+        
+        await db.query('INSERT INTO resenas (item_id, usuario_codigo, estrellas, comentario) VALUES (?, ?, ?, ?)', [item_id, usuario_codigo, estrellas, comentario]);
+        res.json({ message: "Reseña guardada" });
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
 
-// --- CONTACTOS Y MENSAJES ---
-app.post('/api/contactos', (req, res) => {
+// 7. TESORERÍA: INYECTAR FONDOS
+app.post('/api/admin/fondos', async (req, res) => {
+    const { adminCode, targetPin, monto } = req.body;
+    if(!targetPin || !monto || targetPin.length > 20) return res.status(400).json({ error: "Datos inválidos." });
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
+        
+        const [targetUser] = await db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [targetPin]);
+        if(targetUser.length === 0) return res.status(404).json({ error: "No existe un usuario con esa contraseña." });
+        
+        const nuevoSaldo = parseFloat(targetUser[0].saldo) + parseFloat(monto);
+        await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, targetPin]);
+        res.json({ message: `Fondos inyectados correctamente. Nuevo saldo: $${nuevoSaldo.toFixed(2)}` });
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+});
+
+// 8. RED PRIVADA (CONTACTOS)
+app.get('/api/contactos/:codigo', async (req, res) => {
+    try {
+        const query = `
+            SELECT u.codigo, u.nombre, u.sexo, u.foto 
+            FROM contactos c 
+            JOIN usuarios u ON c.contacto_codigo = u.codigo 
+            WHERE c.usuario_codigo = ?`;
+        const [rows] = await db.query(query, [req.params.codigo]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+});
+
+app.post('/api/contactos', async (req, res) => {
     const { miCodigo, aliasContacto } = req.body;
-    db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [aliasContacto], (err, users) => {
-        if (err || users.length === 0) return res.status(404).json({ error: 'No se encontró el Alias' });
-        if (miCodigo === users[0].codigo) return res.status(400).json({ error: 'No puedes agregarte a ti mismo' });
-        db.query('INSERT IGNORE INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?), (?, ?)', [miCodigo, users[0].codigo, users[0].codigo, miCodigo], (err) => {
-            if (err) return res.status(500).json({ error: 'Error' }); res.json({ success: true, message: 'Conexión establecida' });
-        });
-    });
+    try {
+        const [targetUser] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [aliasContacto]);
+        if(targetUser.length === 0) return res.status(404).json({ error: "Alias no encontrado en la base de datos." });
+        
+        const codigoContacto = targetUser[0].codigo;
+        if(miCodigo === codigoContacto) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
+        
+        const [existe] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [miCodigo, codigoContacto]);
+        if(existe.length > 0) return res.status(400).json({ error: "Este usuario ya está en tu red." });
+        
+        await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codigoContacto]);
+        res.json({ message: "Contacto añadido a tu red privada." });
+    } catch (err) { res.status(500).json({ error: "Error interno" }); }
 });
-app.get('/api/contactos/:codigo', (req, res) => {
-    db.query('SELECT u.codigo, u.nombre, u.sexo, u.foto FROM usuarios u INNER JOIN contactos c ON u.codigo = c.contacto_codigo WHERE c.usuario_codigo = ?', [req.params.codigo], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error' }); res.json(results);
-    });
+
+// 9. MENSAJES
+app.get('/api/mensajes/:user1/:user2', async (req, res) => {
+    const { user1, user2 } = req.params;
+    try {
+        const query = `SELECT * FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?) ORDER BY fecha ASC`;
+        const [rows] = await db.query(query, [user1, user2, user2, user1]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
-app.get('/api/mensajes/:u1/:u2', (req, res) => {
-    db.query('SELECT * FROM mensajes WHERE (remitente_codigo=? AND destinatario_codigo=?) OR (remitente_codigo=? AND destinatario_codigo=?) ORDER BY fecha ASC', [req.params.u1, req.params.u2, req.params.u2, req.params.u1], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Error' }); res.json(results);
-    });
+
+app.post('/api/mensajes', async (req, res) => {
+    const { remitente, destinatario, mensaje } = req.body;
+    try {
+        await db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [remitente, destinatario, mensaje]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Error enviando mensaje" }); }
 });
-app.post('/api/mensajes', (req, res) => {
-    db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [req.body.remitente, req.body.destinatario, req.body.mensaje], (err) => {
-        if (err) return res.status(500).json({ error: 'Error' }); res.json({ success: true });
-    });
+
+// 10. ACTUALIZAR FOTO PERFIL
+app.post('/api/perfil/foto', async (req, res) => {
+    const { codigo, nuevaFoto } = req.body;
+    try {
+        await db.query('UPDATE usuarios SET foto = ? WHERE codigo = ?', [nuevaFoto, codigo]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Error actualizando foto" }); }
 });
-// Servir archivos estáticos
+
+// ==========================================
+// SERVIR ARCHIVOS ESTÁTICOS Y FRONTEND
+// ==========================================
 app.use(express.static('public'));
 
-// Si alguien entra a cualquier ruta, mostrar el index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-app.listen(port, () => console.log(`Servidor NOIR corriendo en http://localhost:${port}`));
+
+// INICIAR SERVIDOR
+app.listen(port, () => {
+    console.log(`Servidor NOIR corriendo en el puerto ${port}`);
+});
