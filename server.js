@@ -17,7 +17,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const db = mysql.createPool({
     host: 'noir-db-solomau3-ac8e.l.aivencloud.com', 
     user: 'avnadmin',                               
-    password: 'PON_AQUÍ_LA_CONTRASEÑA_DE_AIVEN',    // <-- ¡NO OLVIDES CAMBIAR ESTO ANTES DE GUARDAR!
+    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    // <-- ¡NO OLVIDES CAMBIAR ESTO ANTES DE GUARDAR!
     port: 11158,                                    
     database: 'defaultdb',                          
     waitForConnections: true,
