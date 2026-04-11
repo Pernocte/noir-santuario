@@ -17,7 +17,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const db = mysql.createPool({
     host: 'noir-db-solomau3-ac8e.l.aivencloud.com', 
     user: 'avnadmin',                               
-    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    // <-- ¡NO OLVIDES CAMBIAR ESTO!
+    password: 'PON_AQUÍ_LA_CONTRASEÑA_DE_AIVEN',    // <-- ¡NO OLVIDES CAMBIAR ESTO ANTES DE GUARDAR!
     port: 11158,                                    
     database: 'defaultdb',                          
     waitForConnections: true,
@@ -260,7 +260,8 @@ app.post('/api/perfil/foto', async (req, res) => {
 // ==========================================
 app.use(express.static('public'));
 
-app.get('/*', (req, res) => {
+// SOLUCIÓN AL ERROR DE RENDER (EXPRESS 5.0)
+app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
