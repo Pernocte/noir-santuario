@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-
+const path = require('path');
 const app = express();
 const port = 3000;
 
@@ -204,5 +204,11 @@ app.post('/api/mensajes', (req, res) => {
         if (err) return res.status(500).json({ error: 'Error' }); res.json({ success: true });
     });
 });
+// Servir archivos estáticos
+app.use(express.static('public'));
 
+// Si alguien entra a cualquier ruta, mostrar el index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 app.listen(port, () => console.log(`Servidor NOIR corriendo en http://localhost:${port}`));
