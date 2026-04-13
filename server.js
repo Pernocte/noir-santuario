@@ -220,19 +220,19 @@ app.post('/api/contactos', async (req, res) => {
         const codigoContacto = targetUser[0].codigo;
         if(miCodigo === codigoContacto) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
         
+        // 1. TÚ LO AGREGAS A ÉL (Solo lo inserta si no existía antes)
         const [existe] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [miCodigo, codigoContacto]);
-        if(existe.length > 0) return res.status(400).json({ error: "Este usuario ya está en tu red." });
+        if(existe.length === 0) {
+            await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codigoContacto]);
+        }
         
-        // 1. TÚ LO AGREGAS A ÉL
-        await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codigoContacto]);
-        
-        // 2. ÉL TE AGREGA A TI AUTOMÁTICAMENTE (AMISTAD DOBLE)
+        // 2. ÉL TE AGREGA A TI (Garantiza la amistad doble sin importar qué pasó antes)
         const [existeInverso] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [codigoContacto, miCodigo]);
         if(existeInverso.length === 0) {
             await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [codigoContacto, miCodigo]);
         }
         
-        res.json({ message: "Contacto añadido. ¡La conexión ahora es mutua y pueden chatear!" });
+        res.json({ message: "¡Contacto sincronizado! La conexión es mutua." });
     } catch (err) { res.status(500).json({ error: "Error interno" }); }
 });
 
