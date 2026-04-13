@@ -17,7 +17,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const db = mysql.createPool({
     host: 'noir-db-solomau3-ac8e.l.aivencloud.com', 
     user: 'avnadmin',                               
-    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    // <-- ¡NO OLVIDES CAMBIAR ESTO ANTES DE GUARDAR!
+    password: 'PON_AQUÍ_LA_CONTRASEÑA_DE_AIVEN',    // <-- ¡NO OLVIDES CAMBIAR ESTO ANTES DE GUARDAR!
     port: 11158,                                    
     database: 'defaultdb',                          
     waitForConnections: true,
@@ -198,7 +198,7 @@ app.post('/api/admin/fondos', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Error de BD" }); }
 });
 
-// 8. RED PRIVADA (CONTACTOS)
+// 8. RED PRIVADA (CONTACTOS) - AHORA CON AMISTAD MUTUA
 app.get('/api/contactos/:codigo', async (req, res) => {
     try {
         const query = `
@@ -223,8 +223,16 @@ app.post('/api/contactos', async (req, res) => {
         const [existe] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [miCodigo, codigoContacto]);
         if(existe.length > 0) return res.status(400).json({ error: "Este usuario ya está en tu red." });
         
+        // 1. TÚ LO AGREGAS A ÉL
         await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codigoContacto]);
-        res.json({ message: "Contacto añadido a tu red privada." });
+        
+        // 2. ÉL TE AGREGA A TI AUTOMÁTICAMENTE (AMISTAD DOBLE)
+        const [existeInverso] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [codigoContacto, miCodigo]);
+        if(existeInverso.length === 0) {
+            await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [codigoContacto, miCodigo]);
+        }
+        
+        res.json({ message: "Contacto añadido. ¡La conexión ahora es mutua y pueden chatear!" });
     } catch (err) { res.status(500).json({ error: "Error interno" }); }
 });
 
