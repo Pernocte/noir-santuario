@@ -659,6 +659,25 @@
                 }
             }, 3000);
 
+            // TRUCO 3: RADAR DE CONTACTOS (Busca gente nueva en tu buzón cada 5 segundos)
+            setInterval(async () => {
+                // Solo busca si el usuario está viendo la pestaña de Perfil/Chat
+                if (document.getElementById('sec-perfil').classList.contains('active')) {
+                    try {
+                        const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
+                        const contactos = await res.json();
+                        const container = document.getElementById('contact-list-container');
+                        
+                        // Si alguien nuevo te agregó, la cantidad será diferente y la lista se actualizará sola
+                        if (contactos.length !== container.childElementCount) {
+                            cargarContactos();
+                        }
+                    } catch (e) { 
+                        // Silenciar si hay micro-cortes de internet
+                    }
+                }
+            }, 5000);
+
             // --- ADMIN: CREAR USUARIO ---
             let base64NewUser = null;
             document.getElementById('new-user-photo').addEventListener('change', e => {
