@@ -315,12 +315,12 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // RUTA CORRECTA PARA RENDER (Carga desde el mismo servidor)
             const API_URL = '/api'; 
             
             let currentUser = null; 
             let activeItemModalId = null;
             let currentCategoryToAdd = '';
+            let activeChatCode = null;
             
             const antiCache = () => `?t=${new Date().getTime()}`;
 
@@ -448,7 +448,6 @@
                 document.getElementById('confirm-add-item-btn').innerText = "GUARDAR EN CATÁLOGO"; document.getElementById('add-item-modal').style.display = 'none'; cargarItems(currentCategoryToAdd); 
             });
 
-
             // --- COMPRAR DESDE MODAL ---
             const modalDetalle = document.getElementById('item-modal');
             let itemCategoryRef = ''; 
@@ -574,7 +573,6 @@
                 if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
             });
 
-            let activeChatCode = null;
             document.getElementById('add-contact-btn').addEventListener('click', async () => {
                 const alias = prompt("Ingresa el ALIAS del usuario a conectar:");
                 if(!alias) return;
@@ -609,33 +607,57 @@
                 box.scrollTop = box.scrollHeight;
             }
 
-           async function enviarMensaje() {
+            // TRUCO 1: ENVIAR MENSAJE Y MOSTRARLO AL INSTANTE
+            async function enviarMensaje() {
                 const text = document.getElementById('chat-input').value;
                 if(!text || !activeChatCode) return;
+
+                // Dibujar el mensaje en pantalla inmediatamente
+                const box = document.getElementById('chat-box');
+                box.innerHTML += `<div class="msg-bubble msg-sent">${text}</div>`;
+                box.scrollTop = box.scrollHeight;
                 
+                document.getElementById('chat-input').value = ''; // Limpiar input
+
                 try {
-                    const res = await fetch(`${API_URL}/mensajes`, { 
+                    // Guardar silenciosamente en la base de datos
+                    await fetch(`${API_URL}/mensajes`, { 
                         method: 'POST', 
                         headers: {'Content-Type': 'application/json'}, 
                         body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) 
                     });
-                    
-                    const data = await res.json();
-                    
-                    if(res.ok) {
-                        document.getElementById('chat-input').value = ''; 
-                        cargarMensajes();
-                    } else {
-                        // ¡Ahora la página nos dirá qué falló!
-                        alert(`Alerta del Servidor: ${data.error}`);
-                    }
                 } catch(e) {
-                    alert("Alerta de Red: No se pudo conectar con el servidor para enviar el mensaje.");
+                    console.log("Fallo de red al intentar guardar en BD");
                 }
             }
+            
             document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
             document.getElementById('refresh-chat-btn').addEventListener('click', () => { cargarContactos(); cargarMensajes(); });
+
+            // TRUCO 2: RADAR AUTOMÁTICO (Busca mensajes recibidos cada 3 segundos)
+            setInterval(async () => {
+                // Solo busca si estamos en la pestaña de chat y hay un contacto activo
+                if (activeChatCode && document.getElementById('sec-perfil').classList.contains('active')) {
+                    const box = document.getElementById('chat-box');
+                    // Verificamos si el usuario está hasta abajo en el chat
+                    const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
+                    
+                    try {
+                        const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
+                        const msgs = await res.json();
+                        
+                        // Solo redibuja la pantalla si hay mensajes nuevos
+                        if (msgs.length !== box.childElementCount) {
+                            box.innerHTML = '';
+                            msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
+                            if (isAtBottom) box.scrollTop = box.scrollHeight; // Mantener scroll abajo
+                        }
+                    } catch (e) { 
+                        // Silenciar error si parpadea el internet
+                    }
+                }
+            }, 3000);
 
             // --- ADMIN: CREAR USUARIO ---
             let base64NewUser = null;
@@ -665,7 +687,7 @@
                             base64NewUser = null; 
                             document.getElementById('upload-label').innerText = "+ Seleccionar Imagen (Opcional)"; 
                         } else {
-                            alert(`Error: ${data.error}`);
+                            alert(`Error de Servidor: ${data.error}`);
                         }
                     } catch(e) {
                         alert("Error de red intentando conectar con el servidor.");
