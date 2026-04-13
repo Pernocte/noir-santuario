@@ -237,6 +237,7 @@ app.post('/api/contactos', async (req, res) => {
 });
 
 // 9. MENSAJES
+// 9. MENSAJES
 app.get('/api/mensajes/:user1/:user2', async (req, res) => {
     const { user1, user2 } = req.params;
     try {
@@ -249,7 +250,21 @@ app.get('/api/mensajes/:user1/:user2', async (req, res) => {
 app.post('/api/mensajes', async (req, res) => {
     const { remitente, destinatario, mensaje } = req.body;
     try {
+        // 1. Guardar el mensaje en el historial
         await db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [remitente, destinatario, mensaje]);
+        
+        // 2. MAGIA DE AUTO-AGREGADO: Asegurarnos de que el DESTINATARIO nos tenga en su lista
+        const [existeEnDest] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [destinatario, remitente]);
+        if(existeEnDest.length === 0) {
+            await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [destinatario, remitente]);
+        }
+
+        // 3. Asegurarnos de que el REMITENTE también lo tenga (por si acaso)
+        const [existeEnRem] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [remitente, destinatario]);
+        if(existeEnRem.length === 0) {
+            await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [remitente, destinatario]);
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: "Error enviando mensaje" }); }
 });
