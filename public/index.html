@@ -609,11 +609,29 @@
                 box.scrollTop = box.scrollHeight;
             }
 
-            async function enviarMensaje() {
+           async function enviarMensaje() {
                 const text = document.getElementById('chat-input').value;
                 if(!text || !activeChatCode) return;
-                await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
-                document.getElementById('chat-input').value = ''; cargarMensajes();
+                
+                try {
+                    const res = await fetch(`${API_URL}/mensajes`, { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) 
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if(res.ok) {
+                        document.getElementById('chat-input').value = ''; 
+                        cargarMensajes();
+                    } else {
+                        // ¡Ahora la página nos dirá qué falló!
+                        alert(`Alerta del Servidor: ${data.error}`);
+                    }
+                } catch(e) {
+                    alert("Alerta de Red: No se pudo conectar con el servidor para enviar el mensaje.");
+                }
             }
             document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
