@@ -174,7 +174,7 @@ app.post('/api/contactos', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Error interno" }); }
 });
 
-// 9. MENSAJES (MÁGICOS: AGREGAN AL DESTINATARIO AUTOMÁTICAMENTE)
+// 9. MENSAJES E IMÁGENES
 app.get('/api/mensajes/:user1/:user2', async (req, res) => {
     const { user1, user2 } = req.params;
     try {
@@ -186,19 +186,22 @@ app.get('/api/mensajes/:user1/:user2', async (req, res) => {
 app.post('/api/mensajes', async (req, res) => {
     const { remitente, destinatario, mensaje } = req.body;
     try {
-        // Guardar mensaje
         await db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [remitente, destinatario, mensaje]);
-        
-        // Auto-Agregar al remitente en el buzón del destinatario (Estilo WhatsApp)
         const [existeDest] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [destinatario, remitente]);
         if(existeDest.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [destinatario, remitente]);
-        
-        // Auto-Agregar al destinatario en el buzón del remitente
         const [existeRem] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [remitente, destinatario]);
         if(existeRem.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [remitente, destinatario]);
-
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: "Error enviando mensaje" }); }
+});
+
+// NUEVO: BORRAR CHAT
+app.delete('/api/mensajes/:user1/:user2', async (req, res) => {
+    const { user1, user2 } = req.params;
+    try {
+        await db.query('DELETE FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?)', [user1, user2, user2, user1]);
+        res.json({ message: "Historial eliminado exitosamente." });
+    } catch (err) { res.status(500).json({ error: "Error borrando chat" }); }
 });
 
 // 10. FOTO PERFIL
