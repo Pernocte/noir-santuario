@@ -104,7 +104,7 @@
         .chat-sidebar { width: 320px; background: #111; border-right: 1px solid #333; display: flex; flex-direction: column; }
         .chat-sidebar-header { padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
         .contact-list { flex-grow: 1; overflow-y: auto; }
-        .contact-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #1a1a1a; cursor: pointer; }
+        .contact-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #1a1a1a; cursor: pointer; transition: background 0.2s;}
         .contact-item:hover, .contact-item.active { background: #161616; border-left: 3px solid var(--text-gold); }
         .contact-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #222; background-size: cover; margin-right: 15px; }
         
@@ -216,10 +216,10 @@
                 </div>
                 <div class="chat-main">
                     <div class="chat-main-header">
-                        <div class="active-chat-avatar" id="active-chat-avatar"></div>
+                        <div class="active-chat-avatar" id="active-chat-avatar" style="width: 40px; height: 40px; border-radius: 50%; background-size: cover; margin-right: 15px; display: none;"></div>
                         <div class="active-chat-info">
-                            <h3 id="active-chat-name"></h3>
-                            <p id="active-chat-status" style="display:none;">Encriptado &bull; En línea</p>
+                            <h3 id="active-chat-name" style="margin: 0;"></h3>
+                            <p id="active-chat-status" style="margin: 0; font-size: 10px; color: #888; display:none;">Encriptado &bull; En línea</p>
                         </div>
                     </div>
                     <div class="chat-messages" id="chat-box"><div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Selecciona un contacto.</div></div>
@@ -557,127 +557,6 @@
                 } catch(e) { alert("Error de red."); }
             });
 
-            // --- RED PRIVADA Y CHAT ---
-            window.agregarDesdeComentario = async function(aliasAutor) {
-                if(aliasAutor === currentUser.nombre) return alert("No puedes agregarte a ti mismo a tu red.");
-                if(confirm(`¿Deseas agregar a "${aliasAutor}" a tu red privada de contactos?`)) {
-                    try {
-                        const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miCodigo: currentUser.codigo, aliasContacto: aliasAutor }) });
-                        const data = await res.json(); alert(data.message || data.error);
-                    } catch(e) { alert("Error de conexión."); }
-                }
-            };
-
-            document.getElementById('update-photo-input').addEventListener('change', e => {
-                const file = e.target.files[0];
-                if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
-            });
-
-            document.getElementById('add-contact-btn').addEventListener('click', async () => {
-                const alias = prompt("Ingresa el ALIAS del usuario a conectar:");
-                if(!alias) return;
-                const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({miCodigo: currentUser.codigo, aliasContacto: alias}) });
-                const data = await res.json(); alert(data.message || data.error); cargarContactos();
-            });
-
-            async function cargarContactos() {
-                const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
-                const contactos = await res.json();
-                const container = document.getElementById('contact-list-container'); container.innerHTML = '';
-                contactos.forEach(u => {
-                    const div = document.createElement('div'); div.className = 'contact-item';
-                    const bg = u.foto ? `url(${u.foto})` : 'none';
-                    div.innerHTML = `<div class="contact-avatar" style="background-image:${bg}"></div><div class="contact-info"><div class="contact-name">${u.nombre}</div><div class="contact-status">${u.sexo}</div></div>`;
-                    div.addEventListener('click', () => {
-                        activeChatCode = u.codigo; document.getElementById('active-chat-name').innerText = u.nombre;
-                        document.getElementById('active-chat-avatar').style.backgroundImage = bg; document.getElementById('active-chat-avatar').style.display='block';
-                        document.getElementById('active-chat-status').style.display='block'; cargarMensajes();
-                    });
-                    container.appendChild(div);
-                });
-            }
-
-            async function cargarMensajes() {
-                if(!activeChatCode) return;
-                document.getElementById('chat-input').disabled = false; document.getElementById('send-msg-btn').disabled = false; document.getElementById('chat-placeholder').style.display = 'none';
-                const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
-                const msgs = await res.json();
-                const box = document.getElementById('chat-box'); box.innerHTML = '';
-                msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
-                box.scrollTop = box.scrollHeight;
-            }
-
-            // TRUCO 1: ENVIAR MENSAJE Y MOSTRARLO AL INSTANTE
-            async function enviarMensaje() {
-                const text = document.getElementById('chat-input').value;
-                if(!text || !activeChatCode) return;
-
-                // Dibujar el mensaje en pantalla inmediatamente
-                const box = document.getElementById('chat-box');
-                box.innerHTML += `<div class="msg-bubble msg-sent">${text}</div>`;
-                box.scrollTop = box.scrollHeight;
-                
-                document.getElementById('chat-input').value = ''; // Limpiar input
-
-                try {
-                    // Guardar silenciosamente en la base de datos
-                    await fetch(`${API_URL}/mensajes`, { 
-                        method: 'POST', 
-                        headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) 
-                    });
-                } catch(e) {
-                    console.log("Fallo de red al intentar guardar en BD");
-                }
-            }
-            
-            document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
-            document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
-            document.getElementById('refresh-chat-btn').addEventListener('click', () => { cargarContactos(); cargarMensajes(); });
-
-            // TRUCO 2: RADAR AUTOMÁTICO (Busca mensajes recibidos cada 3 segundos)
-            setInterval(async () => {
-                // Solo busca si estamos en la pestaña de chat y hay un contacto activo
-                if (activeChatCode && document.getElementById('sec-perfil').classList.contains('active')) {
-                    const box = document.getElementById('chat-box');
-                    // Verificamos si el usuario está hasta abajo en el chat
-                    const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
-                    
-                    try {
-                        const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
-                        const msgs = await res.json();
-                        
-                        // Solo redibuja la pantalla si hay mensajes nuevos
-                        if (msgs.length !== box.childElementCount) {
-                            box.innerHTML = '';
-                            msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
-                            if (isAtBottom) box.scrollTop = box.scrollHeight; // Mantener scroll abajo
-                        }
-                    } catch (e) { 
-                        // Silenciar error si parpadea el internet
-                    }
-                }
-            }, 3000);
-
-            // TRUCO 3: RADAR DE CONTACTOS (Busca gente nueva en tu buzón cada 5 segundos)
-            setInterval(async () => {
-                // Solo busca si el usuario está viendo la pestaña de Perfil/Chat
-                if (document.getElementById('sec-perfil').classList.contains('active')) {
-                    try {
-                        const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
-                        const contactos = await res.json();
-                        const container = document.getElementById('contact-list-container');
-                        
-                        // Si alguien nuevo te agregó, la cantidad será diferente y la lista se actualizará sola
-                        if (contactos.length !== container.childElementCount) {
-                            cargarContactos();
-                        }
-                    } catch (e) { 
-                        // Silenciar si hay micro-cortes de internet
-                    }
-                }
-            }, 5000);
-
             // --- ADMIN: CREAR USUARIO ---
             let base64NewUser = null;
             document.getElementById('new-user-photo').addEventListener('change', e => {
@@ -715,6 +594,136 @@
                     alert("Por favor llena el Nombre y una Contraseña (máximo 20 caracteres).");
                 }
             });
+
+            // --- ACTUALIZAR FOTO PERFIL ---
+            document.getElementById('update-photo-input').addEventListener('change', e => {
+                const file = e.target.files[0];
+                if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
+            });
+
+
+            // --- RED PRIVADA Y CHAT MÁGICO ---
+
+            // Agregar contacto manual
+            document.getElementById('add-contact-btn').addEventListener('click', async () => {
+                const alias = prompt("Ingresa el ALIAS del usuario a conectar:");
+                if(!alias) return;
+                const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({miCodigo: currentUser.codigo, aliasContacto: alias}) });
+                const data = await res.json(); alert(data.message || data.error); cargarContactos();
+            });
+
+            // Agregar contacto desde reseña
+            window.agregarDesdeComentario = async function(aliasAutor) {
+                if(aliasAutor === currentUser.nombre) return alert("No puedes agregarte a ti mismo a tu red.");
+                if(confirm(`¿Deseas agregar a "${aliasAutor}" a tu red privada de contactos?`)) {
+                    try {
+                        const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miCodigo: currentUser.codigo, aliasContacto: aliasAutor }) });
+                        const data = await res.json(); alert(data.message || data.error);
+                    } catch(e) { alert("Error de conexión."); }
+                }
+            };
+
+            // 1. Cargar la barra lateral de contactos
+            async function cargarContactos() {
+                const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
+                const contactos = await res.json();
+                const container = document.getElementById('contact-list-container'); 
+                container.innerHTML = '';
+                
+                contactos.forEach(u => {
+                    const div = document.createElement('div'); 
+                    // Mantener seleccionado el contacto activo si se recarga la lista
+                    div.className = 'contact-item' + (activeChatCode === u.codigo ? ' active' : '');
+                    const bg = u.foto ? `url(${u.foto})` : 'none';
+                    div.innerHTML = `<div class="contact-avatar" style="background-image:${bg}"></div><div style="color:var(--text-gold); font-weight:bold;">${u.nombre}</div>`;
+                    
+                    div.addEventListener('click', () => {
+                        document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+                        div.classList.add('active');
+                        activeChatCode = u.codigo; 
+                        document.getElementById('active-chat-name').innerText = u.nombre;
+                        document.getElementById('active-chat-avatar').style.backgroundImage = bg; 
+                        document.getElementById('active-chat-avatar').style.display='block';
+                        document.getElementById('active-chat-status').style.display='block'; 
+                        cargarMensajes();
+                    });
+                    container.appendChild(div);
+                });
+            }
+
+            // 2. Cargar historial de un chat
+            async function cargarMensajes() {
+                if(!activeChatCode) return;
+                document.getElementById('chat-input').disabled = false; 
+                document.getElementById('send-msg-btn').disabled = false; 
+                document.getElementById('chat-placeholder').style.display = 'none';
+                
+                const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
+                const msgs = await res.json();
+                const box = document.getElementById('chat-box'); box.innerHTML = '';
+                msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
+                box.scrollTop = box.scrollHeight;
+            }
+
+            // 3. Enviar mensaje
+            async function enviarMensaje() {
+                const text = document.getElementById('chat-input').value;
+                if(!text || !activeChatCode) return;
+
+                // Pintar en pantalla instantáneamente
+                const box = document.getElementById('chat-box');
+                box.innerHTML += `<div class="msg-bubble msg-sent">${text}</div>`;
+                box.scrollTop = box.scrollHeight;
+                document.getElementById('chat-input').value = ''; 
+
+                try {
+                    // Enviar al servidor (El servidor forzará la creación del contacto para el otro)
+                    await fetch(`${API_URL}/mensajes`, { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) 
+                    });
+                } catch(e) { console.log("Error de red"); }
+            }
+            
+            document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
+            document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
+            document.getElementById('refresh-chat-btn').addEventListener('click', () => { cargarContactos(); cargarMensajes(); });
+
+            // 4. EL SÚPER RADAR (Actualiza mensajes Y contactos nuevos automáticamente)
+            setInterval(async () => {
+                if (document.getElementById('sec-perfil').classList.contains('active')) {
+                    
+                    // A. Actualizar mensajes del chat abierto
+                    if (activeChatCode) {
+                        try {
+                            const resMsgs = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
+                            const msgs = await resMsgs.json();
+                            const box = document.getElementById('chat-box');
+                            const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
+                            
+                            if (msgs.length !== box.childElementCount) {
+                                box.innerHTML = '';
+                                msgs.forEach(m => box.innerHTML += `<div class="msg-bubble ${m.remitente_codigo === currentUser.codigo ? 'msg-sent' : 'msg-received'}">${m.mensaje}</div>`);
+                                if (isAtBottom) box.scrollTop = box.scrollHeight;
+                            }
+                        } catch(e) {}
+                    }
+
+                    // B. Actualizar lista de contactos (por si un extraño nos escribió)
+                    try {
+                        const resCont = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
+                        const contactos = await resCont.json();
+                        const container = document.getElementById('contact-list-container');
+                        
+                        // Si el tamaño de la lista cambió, significa que el servidor nos añadió a alguien nuevo
+                        if (contactos.length !== container.childElementCount) {
+                            cargarContactos();
+                        }
+                    } catch(e) {}
+                }
+            }, 3000); 
+
         });
     </script>
 </body>
