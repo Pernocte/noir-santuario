@@ -110,7 +110,7 @@
         .chat-input-area .input-field { border-radius: 20px; padding: 12px 20px; margin: 0; flex-grow: 1;}
         .chat-btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; color: #888; transition: color 0.2s; padding: 0 5px;}
         .chat-btn-icon:hover { color: var(--text-gold); }
-        .chat-send-btn { background: var(--text-gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-weight: bold; flex-shrink: 0;}
+        .chat-send-btn { background: var(--text-gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-weight: bold; flex-shrink: 0; color: #111;}
         .chat-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; width: 80%;}
         
         .back-btn-mobile { display: none; } 
@@ -305,9 +305,10 @@
             let currentCategoryToAdd = '';
             let activeChatCode = null;
             
-            // CACHÉ VISUAL PARA EVITAR PARPADEOS EN MÓVILES
+            // NUEVO SISTEMA DE CACHÉ Y TRACKING EN VIVO
             let lastContactsHTML = '';
-            let lastMessagesHTML = '';
+            let lastMessageCount = -1;
+            let lastReadCount = -1;
 
             const antiCache = () => `?t=${new Date().getTime()}`;
 
@@ -316,7 +317,7 @@
                 document.getElementById('my-profile-balance').innerText = `FONDOS: $${parseFloat(nuevoSaldo).toFixed(2)}`;
             }
 
-            // --- LOGIN Y TABS (Intacto) ---
+            // --- LOGIN Y TABS ---
             async function handleLogin() {
                 const code = document.getElementById('access-code').value;
                 if (!code) return;
@@ -361,7 +362,7 @@
             }
             document.querySelectorAll('.nav-btn[data-target]').forEach(btn => btn.addEventListener('click', (e) => switchTab(e.target.getAttribute('data-target'))));
 
-            // --- EVENTO, ITEMS, COMPRAS, FOTOS (Intacto) ---
+            // --- EVENTOS, ITEMS, COMPRAS, ADMIN ---
             async function cargarEvento() {
                 const res = await fetch(`${API_URL}/evento${antiCache()}`);
                 const ev = await res.json();
@@ -481,8 +482,9 @@
                 if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
             });
 
+
             // ==============================================================
-            // RED PRIVADA: OPTIMIZADA PARA MÓVILES (ANTI-PARPADEO Y SCROLL FORZADO)
+            // RED PRIVADA: ACTUALIZACIONES INSTANTÁNEAS ("EN VIVO")
             // ==============================================================
 
             document.getElementById('add-contact-btn').addEventListener('click', async () => {
@@ -511,7 +513,6 @@
                 const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
                 const contactos = await res.json();
                 const ahora = new Date();
-                
                 let tempHTML = '';
                 
                 contactos.forEach(u => {
@@ -527,14 +528,12 @@
                     </div>`;
                 });
 
-                // Si la lista visual no ha cambiado, no tocamos el DOM (evita parpadeo)
                 if (tempHTML === lastContactsHTML) return;
                 lastContactsHTML = tempHTML;
 
                 const container = document.getElementById('contact-list-container'); 
                 container.innerHTML = tempHTML;
 
-                // Re-asignar eventos a la nueva lista
                 container.querySelectorAll('.contact-item').forEach(div => {
                     div.addEventListener('click', () => {
                         activeChatCode = div.getAttribute('data-codigo');
@@ -542,7 +541,7 @@
                         const bg = div.getAttribute('data-bg');
                         const isOnline = div.getAttribute('data-online') === 'true';
 
-                        lastContactsHTML = ''; // Forzar actualización para pintar el 'active'
+                        lastContactsHTML = ''; // Resetea caché para pintar "active"
                         cargarContactos(); 
                         
                         document.getElementById('active-chat-name').innerText = nom;
@@ -557,8 +556,9 @@
                         document.getElementById('mobile-sidebar').classList.add('hidden-mobile');
                         document.getElementById('mobile-chat-main').classList.add('active-mobile');
 
-                        lastMessagesHTML = ''; // Forzar recarga completa del chat
-                        cargarMensajes(true); // El true fuerza el scroll al fondo
+                        lastMessageCount = -1; // Reset de contadores
+                        lastReadCount = -1; 
+                        cargarMensajes(true); 
                     });
                 });
             }
@@ -583,41 +583,55 @@
                 const msgs = await res.json();
                 const box = document.getElementById('chat-box'); 
                 
+                // NUEVO TRACKER: Solo revisamos cantidad de msgs y leídos
+                const currentMsgCount = msgs.length;
+                const currentReadCount = msgs.filter(m => m.leido).length;
+
+                // Si nada cambió, no parpadeamos la pantalla
+                if (currentMsgCount === lastMessageCount && currentReadCount === lastReadCount && !forceScroll) return;
+
+                lastMessageCount = currentMsgCount;
+                lastReadCount = currentReadCount;
+
                 let tempHTML = '';
-                if(msgs.length === 0) {
+                if(currentMsgCount === 0) {
                     tempHTML = '<div class="chat-placeholder">Di "Hola". El historial está vacío.</div>';
                 } else {
                     msgs.forEach(m => { tempHTML += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido); });
                 }
 
-                // Si no hay mensajes nuevos ni cambios en los ticks, no tocamos el DOM
-                if (tempHTML === lastMessagesHTML && !forceScroll) return; 
-                lastMessagesHTML = tempHTML;
-
-                // Margen de 150px de tolerancia por si el teclado móvil molesta
                 const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150; 
-
                 box.innerHTML = tempHTML;
                 
-                // Si enviamos mensaje (forceScroll) o ya estábamos leyendo lo último, bajar el scroll
                 if (forceScroll || isAtBottom) {
                     setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
                 }
             }
 
+            // ACTUALIZACIÓN OPTIMISTA: Al enviar texto, aparece INMEDIATAMENTE
             async function enviarMensaje() {
                 const text = document.getElementById('chat-input').value;
                 if(!text || !activeChatCode) return;
                 document.getElementById('chat-input').value = ''; 
+
+                // 1. INYECTAR EN PANTALLA (Para sensación "En Vivo")
+                const box = document.getElementById('chat-box');
+                if(box.innerHTML.includes('chat-placeholder')) box.innerHTML = '';
+                box.innerHTML += dibujarBurbuja(text, true, 0); 
+                lastMessageCount++; // Sumamos al tracker
+                setTimeout(() => { box.scrollTop = box.scrollHeight; }, 10);
+
+                // 2. ENVIAR A LA BASE DE DATOS POR DETRÁS
                 try {
                     await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
-                    cargarMensajes(true); // TRUE = Fuerza el scroll sin importar el teclado móvil
+                    cargarMensajes(true);
                 } catch(e) {}
             }
             
             document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
 
+            // ACTUALIZACIÓN OPTIMISTA: Fotos instantáneas
             document.getElementById('chat-img-btn').addEventListener('click', () => { if(activeChatCode) document.getElementById('chat-img-input').click(); });
             
             document.getElementById('chat-img-input').addEventListener('change', e => {
@@ -639,9 +653,16 @@
                             ctx.drawImage(img, 0, 0, width, height);
                             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
                             
+                            // INYECTAR FOTO EN PANTALLA AL INSTANTE
+                            const box = document.getElementById('chat-box');
+                            if(box.innerHTML.includes('chat-placeholder')) box.innerHTML = '';
+                            box.innerHTML += dibujarBurbuja(compressedBase64, true, 0); 
+                            lastMessageCount++; 
+                            setTimeout(() => { box.scrollTop = box.scrollHeight; }, 10);
+
                             try {
                                 await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: compressedBase64}) });
-                                cargarMensajes(true); // TRUE = Fuerza el scroll al enviar imagen
+                                cargarMensajes(true); 
                             } catch(e) {}
                         };
                         img.src = event.target.result;
@@ -655,17 +676,17 @@
                 if(confirm("⚠ ¿Seguro que deseas borrar TODO el historial de chat con este usuario? Esta acción es permanente y no se puede deshacer.")) {
                     try {
                         await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}`, { method: 'DELETE' });
-                        lastMessagesHTML = ''; // Limpiamos la caché
+                        lastMessageCount = -1; lastReadCount = -1; // Resetear caché
                         cargarMensajes();
                     } catch(e) { alert("Error borrando el historial."); }
                 }
             });
 
-            // EL SÚPER RADAR (Ahora 100% silencioso y fluido)
+            // EL SÚPER RADAR (Optimizado)
             setInterval(async () => {
                 if (document.getElementById('sec-perfil').classList.contains('active')) {
                     cargarContactos(); 
-                    if (activeChatCode) cargarMensajes(false); // No forzar scroll aquí
+                    if (activeChatCode) cargarMensajes(false); 
                 }
             }, 3000); 
         });
