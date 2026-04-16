@@ -623,7 +623,8 @@
             }
 
             // 3. LA MAGIA: Cargar Mensajes a prueba de fallos de Scroll y Parpadeos
-         async function cargarMensajes(forceScroll = false) {
+        // 3. LA MAGIA: Cargar Mensajes a prueba de fallos
+            async function cargarMensajes(forceScroll = false) {
                 if(!activeChatCode) return;
                 document.getElementById('chat-input').disabled = false; 
                 document.getElementById('send-msg-btn').disabled = false; 
@@ -641,10 +642,15 @@
                     // Solo redibujamos si REALMENTE algo cambió en la BD
                     if (estadoActual !== ultimoEstadoMensajes || forceScroll) {
                         ultimoEstadoMensajes = estadoActual;
-                        document.getElementById('chat-placeholder').style.display = 'none';
+                        
+                        // ------ ¡LA CORRECCIÓN ESTÁ AQUÍ! ------
+                        // Verificamos si existe antes de intentar ocultarlo
+                        const placeholder = document.getElementById('chat-placeholder');
+                        if (placeholder) placeholder.style.display = 'none';
+                        // --------------------------------------
                         
                         if(msgs.length === 0) {
-                            box.innerHTML = '<div class="chat-placeholder" id="chat-placeholder">Di "Hola". Historial vacío.</div>';
+                            box.innerHTML = '<div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Di "Hola". El historial está vacío.</div>';
                         } else {
                             let htmlBuffer = '';
                             msgs.forEach(m => htmlBuffer += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
