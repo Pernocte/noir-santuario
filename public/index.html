@@ -315,7 +315,7 @@
             let activeChatCode = null;
             
             // VARIABLES GLOBALES DEL RADAR
-            let lastContactsHTML = '';
+            let lastContactsHTML = "";
             let ultimoEstadoMensajes = "";
 
             const antiCache = () => `?t=${new Date().getTime()}`;
@@ -623,7 +623,7 @@
             }
 
             // 3. LA MAGIA: Cargar Mensajes a prueba de fallos de Scroll y Parpadeos
-            async function cargarMensajes(forceScroll = false) {
+         async function cargarMensajes(forceScroll = false) {
                 if(!activeChatCode) return;
                 document.getElementById('chat-input').disabled = false; 
                 document.getElementById('send-msg-btn').disabled = false; 
@@ -634,35 +634,34 @@
                     const msgs = await resMsgs.json();
                     const box = document.getElementById('chat-box');
                     
-                    // ¿Cuántos mensajes teníamos la última vez?
+                    // Comparamos cantidad total + cantidad de leídos
                     const cantidadAnterior = ultimoEstadoMensajes ? parseInt(ultimoEstadoMensajes.split('-')[0]) : 0;
                     const estadoActual = msgs.length + "-" + msgs.filter(m => m.leido).length;
                     
+                    // Solo redibujamos si REALMENTE algo cambió en la BD
                     if (estadoActual !== ultimoEstadoMensajes || forceScroll) {
                         ultimoEstadoMensajes = estadoActual;
                         document.getElementById('chat-placeholder').style.display = 'none';
                         
                         if(msgs.length === 0) {
-                            box.innerHTML = '<div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Di "Hola". El historial está vacío.</div>';
+                            box.innerHTML = '<div class="chat-placeholder" id="chat-placeholder">Di "Hola". Historial vacío.</div>';
                         } else {
-                            // Usamos un "Buffer" (htmlBuffer) para no congelar el celular reconstruyendo foto por foto.
                             let htmlBuffer = '';
                             msgs.forEach(m => htmlBuffer += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
                             box.innerHTML = htmlBuffer;
                         }
                         
-                        // EL ARREGLO DEL RECEPTOR: Si hay MÁS mensajes ahora que antes, FUERZA EL SCROLL, ignora el teclado abierto.
+                        // SI LLEGAN MENSAJES NUEVOS (Recibidos): Forzamos el scroll al fondo
                         if (forceScroll || msgs.length > cantidadAnterior) {
                             setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
                         } else {
-                            // Si solo cambió un "tick" de lectura, revisamos si ya estaba abajo para mantenerlo ahí.
+                            // Si solo cambiaron ticks, mantenemos el scroll donde estaba si estaba al final
                             const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150;
                             if (isAtBottom) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
                         }
                     }
                 } catch(e) { console.error(e); }
             }
-
             // 4. Enviar Mensaje (Inyección UI ultra rápida)
             async function enviarMensaje() {
                 const text = document.getElementById('chat-input').value;
@@ -673,14 +672,15 @@
                 const placeholder = document.getElementById('chat-placeholder');
                 if(placeholder) placeholder.style.display = 'none';
                 
+                // Inyectamos burbuja temporal con tick gris (false)
                 const div = document.createElement('div');
                 div.innerHTML = dibujarBurbuja(text, true, false); 
                 box.appendChild(div.firstChild);
-                setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
+                box.scrollTop = box.scrollHeight;
 
                 try {
                     await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
-                    cargarMensajes(true);
+                    cargarMensajes(true); // Confirmamos con la BD
                 } catch(e) {}
             }
             
@@ -742,10 +742,11 @@
             });
 
             // 7. EL RADAR SIMPLIFICADO Y LIMPIO
-            setInterval(async () => {
+           setInterval(async () => {
+                // Solo si el usuario está viendo la pestaña de Perfil/Red Privada
                 if (document.getElementById('sec-perfil').classList.contains('active')) {
                     if (activeChatCode) {
-                        // Delega toda la lógica y seguridad visual a cargarMensajes
+                        // El motor de cargarMensajes ahora detecta el "En Vivo" del receptor
                         await cargarMensajes(false); 
                     }
                     try {
@@ -753,9 +754,11 @@
                         const contactos = await resCont.json();
                         const container = document.getElementById('contact-list-container');
                         
+                        // Actualizar lista solo si hay gente nueva
                         if (contactos.length !== container.childElementCount) {
                             cargarContactos(); 
                         } else {
+                            // Actualizar puntitos verdes y estado en el header
                             const ahora = new Date();
                             contactos.forEach(c => {
                                 const isOnline = (ahora - new Date(c.ultima_conexion)) < 120000;
@@ -770,7 +773,7 @@
                         }
                     } catch(e) {}
                 }
-            }, 3000); 
+            }, 3000);
 
         });
     </script>
