@@ -110,7 +110,7 @@
         .chat-input-area .input-field { border-radius: 20px; padding: 12px 20px; margin: 0; flex-grow: 1;}
         .chat-btn-icon { background: none; border: none; font-size: 22px; cursor: pointer; color: #888; transition: color 0.2s; padding: 0 5px;}
         .chat-btn-icon:hover { color: var(--text-gold); }
-        .chat-send-btn { background: var(--text-gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-weight: bold; flex-shrink: 0;}
+        .chat-send-btn { background: var(--text-gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-weight: bold; flex-shrink: 0; color: #111;}
         .chat-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; width: 80%;}
         
         .back-btn-mobile { display: none; } 
@@ -305,7 +305,7 @@
             let currentCategoryToAdd = '';
             let activeChatCode = null;
             
-            // VARIABLES DEL SÚPER RADAR
+            // VARIABLES GLOBALES DEL RADAR
             let lastContactsHTML = '';
             let ultimoEstadoMensajes = "";
 
@@ -495,7 +495,7 @@
 
 
             // ==============================================================
-            // RED PRIVADA: ACTUALIZACIONES INSTANTÁNEAS Y SÚPER RADAR
+            // RED PRIVADA: MOTOR DE CHAT EN VIVO CORREGIDO
             // ==============================================================
 
             document.getElementById('add-contact-btn').addEventListener('click', async () => {
@@ -520,7 +520,7 @@
                 document.getElementById('mobile-sidebar').classList.remove('hidden-mobile');
             });
 
-            // 1. DIBUJAR BURBUJA (SOPORTA TICKS)
+            // 1. Dibujar Burbuja 
             function dibujarBurbuja(mensaje, esMio, leido) {
                 const claseBurbuja = esMio ? 'msg-sent' : 'msg-received';
                 const tickColor = leido ? '#c6ac71' : '#555';
@@ -532,7 +532,7 @@
                 return `<div class="msg-bubble ${claseBurbuja}">${mensaje}${tickHTML}</div>`;
             }
 
-            // 2. CARGAR CONTACTOS (CON DOTS DINÁMICOS)
+            // 2. Cargar Contactos y Puntos Verdes
             async function cargarContactos() {
                 const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
                 const contactos = await res.json();
@@ -567,7 +567,7 @@
                         const bg = div.getAttribute('data-bg');
                         const isOnline = div.getAttribute('data-online') === 'true';
 
-                        lastContactsHTML = ''; // Resetea caché para pintar "active"
+                        lastContactsHTML = ''; 
                         cargarContactos(); 
                         
                         document.getElementById('active-chat-name').innerText = nom;
@@ -582,48 +582,67 @@
                         document.getElementById('mobile-sidebar').classList.add('hidden-mobile');
                         document.getElementById('mobile-chat-main').classList.add('active-mobile');
 
-                        ultimoEstadoMensajes = ""; // Resetear estado de mensajes
+                        ultimoEstadoMensajes = ""; 
                         cargarMensajes(true); 
                     });
                 });
             }
 
-            // 3. CARGAR MENSAJES
+            // 3. LA MAGIA: Cargar Mensajes a prueba de fallos de Scroll y Parpadeos
             async function cargarMensajes(forceScroll = false) {
                 if(!activeChatCode) return;
-                document.getElementById('chat-input').disabled = false; document.getElementById('send-msg-btn').disabled = false; document.getElementById('chat-img-btn').disabled = false;
-                document.getElementById('chat-placeholder').style.display = 'none';
+                document.getElementById('chat-input').disabled = false; 
+                document.getElementById('send-msg-btn').disabled = false; 
+                document.getElementById('chat-img-btn').disabled = false;
                 
-                const resMsgs = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
-                const msgs = await resMsgs.json();
-                const box = document.getElementById('chat-box');
-                const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150;
-                
-                const estadoActual = msgs.length + "-" + msgs.filter(m => m.leido).length;
-                
-                if (estadoActual !== ultimoEstadoMensajes || forceScroll) {
-                    ultimoEstadoMensajes = estadoActual;
-                    box.innerHTML = '';
-                    if(msgs.length === 0) {
-                        box.innerHTML = '<div class="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Di "Hola". El historial está vacío.</div>';
-                    } else {
-                        msgs.forEach(m => box.innerHTML += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
+                try {
+                    const resMsgs = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
+                    const msgs = await resMsgs.json();
+                    const box = document.getElementById('chat-box');
+                    
+                    // ¿Cuántos mensajes teníamos la última vez?
+                    const cantidadAnterior = ultimoEstadoMensajes ? parseInt(ultimoEstadoMensajes.split('-')[0]) : 0;
+                    const estadoActual = msgs.length + "-" + msgs.filter(m => m.leido).length;
+                    
+                    if (estadoActual !== ultimoEstadoMensajes || forceScroll) {
+                        ultimoEstadoMensajes = estadoActual;
+                        document.getElementById('chat-placeholder').style.display = 'none';
+                        
+                        if(msgs.length === 0) {
+                            box.innerHTML = '<div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Di "Hola". El historial está vacío.</div>';
+                        } else {
+                            // Usamos un "Buffer" (htmlBuffer) para no congelar el celular reconstruyendo foto por foto.
+                            let htmlBuffer = '';
+                            msgs.forEach(m => htmlBuffer += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
+                            box.innerHTML = htmlBuffer;
+                        }
+                        
+                        // EL ARREGLO DEL RECEPTOR: Si hay MÁS mensajes ahora que antes, FUERZA EL SCROLL, ignora el teclado abierto.
+                        if (forceScroll || msgs.length > cantidadAnterior) {
+                            setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
+                        } else {
+                            // Si solo cambió un "tick" de lectura, revisamos si ya estaba abajo para mantenerlo ahí.
+                            const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150;
+                            if (isAtBottom) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
+                        }
                     }
-                    if (isAtBottom || forceScroll) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
-                }
+                } catch(e) { console.error(e); }
             }
 
-            // 4. ENVIAR MENSAJE (UI OPTIMISTA)
+            // 4. Enviar Mensaje (Inyección UI ultra rápida)
             async function enviarMensaje() {
                 const text = document.getElementById('chat-input').value;
                 if(!text || !activeChatCode) return;
                 document.getElementById('chat-input').value = ''; 
 
                 const box = document.getElementById('chat-box');
-                if(box.innerHTML.includes('chat-placeholder')) box.innerHTML = '';
+                const placeholder = document.getElementById('chat-placeholder');
+                if(placeholder) placeholder.style.display = 'none';
                 
-                box.innerHTML += dibujarBurbuja(text, true, false); 
-                setTimeout(() => { box.scrollTop = box.scrollHeight; }, 10);
+                const div = document.createElement('div');
+                div.innerHTML = dibujarBurbuja(text, true, false); 
+                box.appendChild(div.firstChild);
+                setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
 
                 try {
                     await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
@@ -634,7 +653,7 @@
             document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
 
-            // 5. ENVIAR FOTOS CON CANVAS
+            // 5. Enviar Imágenes
             document.getElementById('chat-img-btn').addEventListener('click', () => { if(activeChatCode) document.getElementById('chat-img-input').click(); });
             
             document.getElementById('chat-img-input').addEventListener('change', e => {
@@ -657,9 +676,13 @@
                             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
                             
                             const box = document.getElementById('chat-box');
-                            if(box.innerHTML.includes('chat-placeholder')) box.innerHTML = '';
-                            box.innerHTML += dibujarBurbuja(compressedBase64, true, false); 
-                            setTimeout(() => { box.scrollTop = box.scrollHeight; }, 10);
+                            const placeholder = document.getElementById('chat-placeholder');
+                            if(placeholder) placeholder.style.display = 'none';
+                            
+                            const div = document.createElement('div');
+                            div.innerHTML = dibujarBurbuja(compressedBase64, true, false); 
+                            box.appendChild(div.firstChild);
+                            setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
 
                             try {
                                 await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: compressedBase64}) });
@@ -672,40 +695,24 @@
                 }
             });
 
+            // 6. Borrar Chat
             document.getElementById('delete-chat-btn').addEventListener('click', async () => {
                 if(!activeChatCode) return;
                 if(confirm("⚠ ¿Seguro que deseas borrar TODO el historial de chat con este usuario? Esta acción es permanente y no se puede deshacer.")) {
                     try {
                         await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}`, { method: 'DELETE' });
                         ultimoEstadoMensajes = ""; 
-                        cargarMensajes();
+                        cargarMensajes(true);
                     } catch(e) { alert("Error borrando el historial."); }
                 }
             });
 
-            // 6. EL SÚPER RADAR (Optimizado para no parpadear)
+            // 7. EL RADAR SIMPLIFICADO Y LIMPIO
             setInterval(async () => {
                 if (document.getElementById('sec-perfil').classList.contains('active')) {
                     if (activeChatCode) {
-                        try {
-                            const resMsgs = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
-                            const msgs = await resMsgs.json();
-                            const box = document.getElementById('chat-box');
-                            const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150;
-                            
-                            const estadoActual = msgs.length + "-" + msgs.filter(m => m.leido).length;
-                            
-                            if (estadoActual !== ultimoEstadoMensajes) {
-                                ultimoEstadoMensajes = estadoActual;
-                                box.innerHTML = '';
-                                if(msgs.length === 0) {
-                                    box.innerHTML = '<div class="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Di "Hola". El historial está vacío.</div>';
-                                } else {
-                                    msgs.forEach(m => box.innerHTML += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
-                                }
-                                if (isAtBottom) box.scrollTop = box.scrollHeight;
-                            }
-                        } catch(e) {}
+                        // Delega toda la lógica y seguridad visual a cargarMensajes
+                        await cargarMensajes(false); 
                     }
                     try {
                         const resCont = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
