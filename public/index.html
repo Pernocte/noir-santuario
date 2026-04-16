@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NOIR - Santuario Privado</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -116,7 +116,7 @@
         .back-btn-mobile { display: none; } 
 
         @media (max-width: 768px) {
-            .social-chat-container { flex-direction: column; height: 75vh; border: none; border-radius: 0; }
+            .social-chat-container { flex-direction: column; height: 80vh; border: none; border-radius: 0; }
             .chat-sidebar { width: 100%; height: 100%; border-right: none; }
             .chat-main { display: none; width: 100%; height: 100%; }
             .chat-sidebar.hidden-mobile { display: none; }
@@ -304,6 +304,11 @@
             let activeItemModalId = null;
             let currentCategoryToAdd = '';
             let activeChatCode = null;
+            
+            // CACHÉ VISUAL PARA EVITAR PARPADEOS EN MÓVILES
+            let lastContactsHTML = '';
+            let lastMessagesHTML = '';
+
             const antiCache = () => `?t=${new Date().getTime()}`;
 
             function actualizarSaldoUI(nuevoSaldo) {
@@ -311,7 +316,7 @@
                 document.getElementById('my-profile-balance').innerText = `FONDOS: $${parseFloat(nuevoSaldo).toFixed(2)}`;
             }
 
-            // --- LOGIN ---
+            // --- LOGIN Y TABS (Intacto) ---
             async function handleLogin() {
                 const code = document.getElementById('access-code').value;
                 if (!code) return;
@@ -347,7 +352,6 @@
             document.getElementById('access-code').addEventListener('keypress', (e) => { if(e.key==='Enter') handleLogin(); });
             document.getElementById('logout-btn').addEventListener('click', () => location.reload());
 
-            // --- NAVEGACIÓN TABS ---
             function switchTab(targetId) {
                 document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
@@ -357,7 +361,7 @@
             }
             document.querySelectorAll('.nav-btn[data-target]').forEach(btn => btn.addEventListener('click', (e) => switchTab(e.target.getAttribute('data-target'))));
 
-            // --- EVENTO ---
+            // --- EVENTO, ITEMS, COMPRAS, FOTOS (Intacto) ---
             async function cargarEvento() {
                 const res = await fetch(`${API_URL}/evento${antiCache()}`);
                 const ev = await res.json();
@@ -374,12 +378,10 @@
                 document.getElementById('event-edit-mode').style.display = 'none'; document.getElementById('event-display-mode').style.display = 'block'; cargarEvento(); 
             });
 
-            // --- CATÁLOGOS ---
             async function cargarItems(categoria) {
                 const res = await fetch(`${API_URL}/items/${categoria}${antiCache()}`);
                 const items = await res.json();
                 const container = document.getElementById(`grid-${categoria}`); container.innerHTML = '';
-                
                 items.forEach(item => {
                     const div = document.createElement('div'); div.className = 'grid-item';
                     const delBtnHTML = (currentUser.rol === 'admin') ? `<button class="del-btn admin-only-block" style="display:block;" onclick="borrarItem(${item.id}, '${categoria}', event)">X</button>` : '';
@@ -397,10 +399,9 @@
                 event.stopPropagation();
                 if(confirm("¿Eliminar permanentemente?")) { await fetch(`${API_URL}/items/${id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({adminCode: currentUser.codigo})}); cargarItems(categoria); }
             }
-
             window.abrirModalAgregar = function(categoria) { currentCategoryToAdd = categoria; document.getElementById('add-item-cat-label').innerText = categoria; document.getElementById('add-item-modal').style.display = 'flex'; }
             document.getElementById('close-add-modal').addEventListener('click', () => document.getElementById('add-item-modal').style.display = 'none');
-
+            
             let base64NewItem = null; const lblItemFoto = document.getElementById('lbl-item-foto');
             document.getElementById('adm-item-foto').addEventListener('change', e => {
                 const file = e.target.files[0]; if(file) { lblItemFoto.innerText = "✓ Foto Cargada"; lblItemFoto.style.borderColor = "#27c93f"; const reader = new FileReader(); reader.onloadend = () => base64NewItem = reader.result; reader.readAsDataURL(file); }
@@ -415,7 +416,6 @@
                 document.getElementById('confirm-add-item-btn').innerText = "GUARDAR EN CATÁLOGO"; document.getElementById('add-item-modal').style.display = 'none'; cargarItems(currentCategoryToAdd); 
             });
 
-            // --- COMPRAS MODAL ---
             const modalDetalle = document.getElementById('item-modal');
             let itemCategoryRef = ''; 
             document.getElementById('close-modal').addEventListener('click', () => modalDetalle.style.display = 'none');
@@ -429,7 +429,6 @@
                 document.getElementById('my-comment-text').value = ''; document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
                 cargarResenas(item.id); modalDetalle.style.display = 'flex';
             }
-
             document.getElementById('buy-item-btn').addEventListener('click', async () => {
                 if(!confirm(`¿Adquirir producto? Se descontará de tus fondos.`)) return;
                 const res = await fetch(`${API_URL}/comprar`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ codigoUsuario: currentUser.codigo, itemId: activeItemModalId }) });
@@ -437,13 +436,11 @@
                 if(res.ok) { alert(data.message); actualizarSaldoUI(data.nuevoSaldo); modalDetalle.style.display = 'none'; } else { alert(`Error: ${data.error}`); }
             });
 
-            // --- RESEÑAS ---
             async function cargarResenas(itemId) {
                 const res = await fetch(`${API_URL}/items/${itemId}/resenas${antiCache()}`);
                 const reviews = await res.json();
                 const container = document.getElementById('modal-comments'); container.innerHTML = '';
                 let userAlreadyReviewed = false;
-
                 if(reviews.length === 0) container.innerHTML = '<p style="color:#555; text-align:center; font-size:12px;">Sin valoraciones aún.</p>';
                 else {
                     reviews.forEach(r => {
@@ -456,7 +453,6 @@
                 document.getElementById('review-form-container').style.display = userAlreadyReviewed ? 'none' : 'block';
                 document.getElementById('already-reviewed-msg').style.display = userAlreadyReviewed ? 'block' : 'none';
             }
-
             document.getElementById('submit-review-btn').addEventListener('click', async () => {
                 const texto = document.getElementById('my-comment-text').value; const starChecked = document.querySelector('input[name="rating"]:checked');
                 if(!starChecked) return alert("Selecciona una calificación.");
@@ -464,7 +460,6 @@
                 if (res.ok) { cargarResenas(activeItemModalId); cargarItems(itemCategoryRef); } else { alert((await res.json()).error); }
             });
 
-            // --- ADMIN ---
             document.getElementById('add-fondos-btn').addEventListener('click', async () => {
                 const targetPin = document.getElementById('adm-fondos-pin').value; const monto = document.getElementById('adm-fondos-monto').value;
                 if(!targetPin || !monto) return alert("Ingresa PIN y monto.");
@@ -472,10 +467,8 @@
                 const data = await res.json();
                 if(res.ok) { alert(data.message); document.getElementById('adm-fondos-pin').value = ''; document.getElementById('adm-fondos-monto').value = ''; if(targetPin === currentUser.codigo) actualizarSaldoUI(parseFloat(currentUser.saldo) + parseFloat(monto)); } else { alert(`Error: ${data.error}`); }
             });
-
             let base64NewUser = null;
             document.getElementById('new-user-photo').addEventListener('change', e => { const f = e.target.files[0]; if(f) { document.getElementById('upload-label').innerText = "✓ Lista"; const r = new FileReader(); r.onloadend = () => base64NewUser = r.result; r.readAsDataURL(f); } });
-            
             document.getElementById('create-user-btn').addEventListener('click', async () => {
                 const name = document.getElementById('new-user-name').value; const sex = document.getElementById('new-user-sex').value; const code = document.getElementById('new-user-code').value;
                 if(code.length > 0 && code.length <= 20 && name) {
@@ -483,30 +476,29 @@
                     if(res.ok) { alert("Acceso creado exitosamente."); document.getElementById('new-user-name').value = ''; document.getElementById('new-user-code').value = ''; base64NewUser = null; document.getElementById('upload-label').innerText = "+ Imagen (Opcional)"; } else { alert(`Error: ${(await res.json()).error}`); }
                 } else { alert("Llena el Nombre y Contraseña."); }
             });
-
-            // Foto Perfil
             document.getElementById('update-photo-input').addEventListener('change', e => {
                 const file = e.target.files[0];
                 if(file) { const r = new FileReader(); r.onloadend = async () => { await fetch(`${API_URL}/perfil/foto`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: currentUser.codigo, nuevaFoto: r.result}) }); currentUser.foto = r.result; document.getElementById('my-profile-pic').style.backgroundImage = `url(${r.result})`; }; r.readAsDataURL(file); }
             });
 
-
             // ==============================================================
-            // RED PRIVADA Y CHAT MÁGICO (ONLINE & TICKS)
+            // RED PRIVADA: OPTIMIZADA PARA MÓVILES (ANTI-PARPADEO Y SCROLL FORZADO)
             // ==============================================================
 
             document.getElementById('add-contact-btn').addEventListener('click', async () => {
                 const alias = prompt("Ingresa el ALIAS del usuario a conectar:");
                 if(!alias) return;
                 const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({miCodigo: currentUser.codigo, aliasContacto: alias}) });
-                alert((await res.json()).message || (await res.json()).error); cargarContactos();
+                alert((await res.json()).message || (await res.json()).error); 
+                lastContactsHTML = ''; cargarContactos();
             });
 
             window.agregarDesdeComentario = async function(aliasAutor) {
                 if(aliasAutor === currentUser.nombre) return alert("No puedes agregarte a ti mismo.");
                 if(confirm(`¿Deseas conectar con "${aliasAutor}"?`)) {
                     const res = await fetch(`${API_URL}/contactos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miCodigo: currentUser.codigo, aliasContacto: aliasAutor }) });
-                    alert((await res.json()).message || (await res.json()).error); cargarContactos();
+                    alert((await res.json()).message || (await res.json()).error); 
+                    lastContactsHTML = ''; cargarContactos();
                 }
             };
 
@@ -518,45 +510,59 @@
             async function cargarContactos() {
                 const res = await fetch(`${API_URL}/contactos/${currentUser.codigo}${antiCache()}`);
                 const contactos = await res.json();
-                const container = document.getElementById('contact-list-container'); container.innerHTML = '';
                 const ahora = new Date();
                 
+                let tempHTML = '';
+                
                 contactos.forEach(u => {
-                    const div = document.createElement('div'); 
-                    div.className = 'contact-item' + (activeChatCode === u.codigo ? ' active' : '');
                     const bg = u.foto ? `url(${u.foto})` : 'none';
-                    
-                    // Lógica Online (2 minutos = 120000 ms)
                     const conTime = new Date(u.ultima_conexion);
                     const isOnline = (ahora - conTime) < 120000; 
                     const dot = isOnline ? `<div style="position:absolute; bottom:0; right:-2px; width:12px; height:12px; background:#27c93f; border:2px solid #111; border-radius:50%;"></div>` : '';
-
-                    div.innerHTML = `<div class="contact-avatar" style="background-image:${bg};">${dot}</div><div style="color:var(--text-gold); font-weight:bold;">${u.nombre}</div>`;
+                    const activeClass = (activeChatCode === u.codigo) ? ' active' : '';
                     
+                    tempHTML += `<div class="contact-item${activeClass}" data-codigo="${u.codigo}" data-nombre="${u.nombre}" data-bg="${bg}" data-online="${isOnline}">
+                        <div class="contact-avatar" style="background-image:${bg};">${dot}</div>
+                        <div style="color:var(--text-gold); font-weight:bold;">${u.nombre}</div>
+                    </div>`;
+                });
+
+                // Si la lista visual no ha cambiado, no tocamos el DOM (evita parpadeo)
+                if (tempHTML === lastContactsHTML) return;
+                lastContactsHTML = tempHTML;
+
+                const container = document.getElementById('contact-list-container'); 
+                container.innerHTML = tempHTML;
+
+                // Re-asignar eventos a la nueva lista
+                container.querySelectorAll('.contact-item').forEach(div => {
                     div.addEventListener('click', () => {
-                        document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
-                        div.classList.add('active');
-                        activeChatCode = u.codigo; 
+                        activeChatCode = div.getAttribute('data-codigo');
+                        const nom = div.getAttribute('data-nombre');
+                        const bg = div.getAttribute('data-bg');
+                        const isOnline = div.getAttribute('data-online') === 'true';
+
+                        lastContactsHTML = ''; // Forzar actualización para pintar el 'active'
+                        cargarContactos(); 
                         
-                        document.getElementById('active-chat-name').innerText = u.nombre;
+                        document.getElementById('active-chat-name').innerText = nom;
                         document.getElementById('active-chat-avatar').style.backgroundImage = bg; 
-                        document.getElementById('active-chat-avatar').style.display='block';
+                        document.getElementById('active-chat-avatar').style.display = 'block';
                         
                         const statusElem = document.getElementById('active-chat-status');
-                        statusElem.style.display='block'; 
+                        statusElem.style.display = 'block'; 
                         statusElem.innerHTML = `Encriptado &bull; <span style="color:${isOnline ? '#27c93f' : '#888'}">${isOnline ? 'En línea' : 'Desconectado'}</span>`;
                         
-                        document.getElementById('delete-chat-btn').style.display='block';
+                        document.getElementById('delete-chat-btn').style.display = 'block';
                         document.getElementById('mobile-sidebar').classList.add('hidden-mobile');
                         document.getElementById('mobile-chat-main').classList.add('active-mobile');
 
-                        cargarMensajes();
+                        lastMessagesHTML = ''; // Forzar recarga completa del chat
+                        cargarMensajes(true); // El true fuerza el scroll al fondo
                     });
-                    container.appendChild(div);
                 });
             }
 
-            // DIBUJAR BURBUJA (CON TICKS)
             function dibujarBurbuja(mensaje, esMio, leido) {
                 const claseBurbuja = esMio ? 'msg-sent' : 'msg-received';
                 const tickColor = leido ? '#c6ac71' : '#555';
@@ -568,7 +574,7 @@
                 return `<div class="msg-bubble ${claseBurbuja}">${mensaje}${tickHTML}</div>`;
             }
 
-            async function cargarMensajes() {
+            async function cargarMensajes(forceScroll = false) {
                 if(!activeChatCode) return;
                 document.getElementById('chat-input').disabled = false; document.getElementById('send-msg-btn').disabled = false; document.getElementById('chat-img-btn').disabled = false;
                 document.getElementById('chat-placeholder').style.display = 'none';
@@ -576,13 +582,27 @@
                 const res = await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}${antiCache()}`);
                 const msgs = await res.json();
                 const box = document.getElementById('chat-box'); 
-                const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
-
-                box.innerHTML = '';
-                if(msgs.length === 0) box.innerHTML = '<div class="chat-placeholder">Di "Hola". El historial está vacío.</div>';
                 
-                msgs.forEach(m => box.innerHTML += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido));
-                if (isAtBottom) box.scrollTop = box.scrollHeight;
+                let tempHTML = '';
+                if(msgs.length === 0) {
+                    tempHTML = '<div class="chat-placeholder">Di "Hola". El historial está vacío.</div>';
+                } else {
+                    msgs.forEach(m => { tempHTML += dibujarBurbuja(m.mensaje, m.remitente_codigo === currentUser.codigo, m.leido); });
+                }
+
+                // Si no hay mensajes nuevos ni cambios en los ticks, no tocamos el DOM
+                if (tempHTML === lastMessagesHTML && !forceScroll) return; 
+                lastMessagesHTML = tempHTML;
+
+                // Margen de 150px de tolerancia por si el teclado móvil molesta
+                const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 150; 
+
+                box.innerHTML = tempHTML;
+                
+                // Si enviamos mensaje (forceScroll) o ya estábamos leyendo lo último, bajar el scroll
+                if (forceScroll || isAtBottom) {
+                    setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
+                }
             }
 
             async function enviarMensaje() {
@@ -591,14 +611,13 @@
                 document.getElementById('chat-input').value = ''; 
                 try {
                     await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: text}) });
-                    cargarMensajes();
+                    cargarMensajes(true); // TRUE = Fuerza el scroll sin importar el teclado móvil
                 } catch(e) {}
             }
             
             document.getElementById('send-msg-btn').addEventListener('click', enviarMensaje);
             document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') enviarMensaje()});
 
-            // ENVÍO DE FOTOS COMPRIMIDAS (CANVAS)
             document.getElementById('chat-img-btn').addEventListener('click', () => { if(activeChatCode) document.getElementById('chat-img-input').click(); });
             
             document.getElementById('chat-img-input').addEventListener('change', e => {
@@ -618,12 +637,11 @@
                             canvas.width = width; canvas.height = height;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, width, height);
-
                             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
                             
                             try {
                                 await fetch(`${API_URL}/mensajes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remitente: currentUser.codigo, destinatario: activeChatCode, mensaje: compressedBase64}) });
-                                cargarMensajes();
+                                cargarMensajes(true); // TRUE = Fuerza el scroll al enviar imagen
                             } catch(e) {}
                         };
                         img.src = event.target.result;
@@ -637,19 +655,19 @@
                 if(confirm("⚠ ¿Seguro que deseas borrar TODO el historial de chat con este usuario? Esta acción es permanente y no se puede deshacer.")) {
                     try {
                         await fetch(`${API_URL}/mensajes/${currentUser.codigo}/${activeChatCode}`, { method: 'DELETE' });
-                        document.getElementById('chat-box').innerHTML = '<div class="chat-placeholder">Historial eliminado de la base de datos.</div>';
+                        lastMessagesHTML = ''; // Limpiamos la caché
+                        cargarMensajes();
                     } catch(e) { alert("Error borrando el historial."); }
                 }
             });
 
-            // EL SÚPER RADAR
+            // EL SÚPER RADAR (Ahora 100% silencioso y fluido)
             setInterval(async () => {
                 if (document.getElementById('sec-perfil').classList.contains('active')) {
-                    cargarContactos(); // Actualiza el punto verde en tiempo real
-                    if (activeChatCode) cargarMensajes(); // Actualiza los ticks en tiempo real
+                    cargarContactos(); 
+                    if (activeChatCode) cargarMensajes(false); // No forzar scroll aquí
                 }
             }, 3000); 
-
         });
     </script>
 </body>
