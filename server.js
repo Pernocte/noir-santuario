@@ -7,16 +7,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Aumentamos el límite para permitir fotos comprimidas en Base64
+app.use(express.json({ limit: '100mb' })); 
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// ==========================================
-// CONEXIÓN A MYSQL (AIVEN CLOUD)
-// ==========================================
 const db = mysql.createPool({
     host: 'noir-db-solomau3-ac8e.l.aivencloud.com', 
     user: 'avnadmin',                               
-    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    // <-- ¡NO OLVIDES CAMBIAR ESTO!
+    password: 'AVNS_RrvZ6qbHIIHQjzzRY1m',    
     port: 11158,                                    
     database: 'defaultdb',                          
     waitForConnections: true,
@@ -32,23 +30,18 @@ app.post('/api/login', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT id, codigo, nombre, rol, foto, saldo FROM usuarios WHERE codigo = ?', [codigo]);
         if (rows.length > 0) res.json({ success: true, user: rows[0] });
-        else res.status(401).json({ success: false, message: "Código inválido o usuario no existe." });
-    } catch (err) { res.status(500).json({ success: false, message: "Error del servidor." }); }
+        else res.status(401).json({ success: false, message: "Código inválido." });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
 // 2. CREAR USUARIO
 app.post('/api/usuarios', async (req, res) => {
     const { adminCode, codigo, nombre, sexo, foto } = req.body;
-    if (!codigo || codigo.length > 20 || !nombre) return res.status(400).json({ error: "Faltan datos o contraseña inválida." });
     try {
         const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
         if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado." });
-
-        const [existe] = await db.query('SELECT id FROM usuarios WHERE codigo = ?', [codigo]);
-        if (existe.length > 0) return res.status(400).json({ error: "PIN ya en uso." });
-
         await db.query('INSERT INTO usuarios (codigo, nombre, sexo, foto) VALUES (?, ?, ?, ?)', [codigo, nombre, sexo || 'No especificado', foto || null]);
-        res.json({ message: "Usuario creado exitosamente" });
+        res.json({ message: "Usuario creado" });
     } catch (err) { res.status(500).json({ error: "Error de BD." }); }
 });
 
@@ -56,9 +49,8 @@ app.post('/api/usuarios', async (req, res) => {
 app.get('/api/evento', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM evento LIMIT 1');
-        if (rows.length > 0) res.json(rows[0]);
-        else res.json({ titulo: "Sin evento", fecha: "", hora: "", descripcion: "" });
-    } catch (err) { res.status(500).json({ error: "Error de servidor" }); }
+        res.json(rows[0] || { titulo: "Sin evento" });
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
 app.put('/api/evento', async (req, res) => {
@@ -68,15 +60,15 @@ app.put('/api/evento', async (req, res) => {
         if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
         await db.query('UPDATE evento SET titulo=?, fecha=?, hora=?, descripcion=? WHERE id=1', [titulo, fecha, hora, descripcion]);
         res.json({ message: "Evento actualizado" });
-    } catch (err) { res.status(500).json({ error: "Error de servidor" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// 4. ITEMS
+// 4. ITEMS Y CATÁLOGOS
 app.get('/api/items/:categoria', async (req, res) => {
     try {
         const [rows] = await db.query(`SELECT i.*, COUNT(r.id) as total_resenas, AVG(r.estrellas) as promedio_estrellas FROM items i LEFT JOIN resenas r ON i.id = r.item_id WHERE i.categoria = ? GROUP BY i.id ORDER BY i.fecha_agregado DESC`, [req.params.categoria]);
         res.json(rows);
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
 app.post('/api/items', async (req, res) => {
@@ -86,7 +78,7 @@ app.post('/api/items', async (req, res) => {
         if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
         await db.query('INSERT INTO items (categoria, nombre, imagen, precio) VALUES (?, ?, ?, ?)', [categoria, nombre, imagen, precio || 0]);
         res.json({ message: "Item creado" });
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
 app.delete('/api/items/:id', async (req, res) => {
@@ -96,10 +88,10 @@ app.delete('/api/items/:id', async (req, res) => {
         if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
         await db.query('DELETE FROM items WHERE id = ?', [req.params.id]);
         res.json({ message: "Item eliminado" });
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// 5. COMPRAS
+// 5. COMPRAS Y FONDOS
 app.post('/api/comprar', async (req, res) => {
     const { codigoUsuario, itemId } = req.body;
     try {
@@ -112,15 +104,80 @@ app.post('/api/comprar', async (req, res) => {
         const nuevoSaldo = saldoActual - precioItem;
         await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, codigoUsuario]);
         res.json({ message: `Compra exitosa: ${itemRows[0].nombre}`, nuevoSaldo: nuevoSaldo });
-    } catch (err) { res.status(500).json({ error: "Error procesando compra" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// 6. RESEÑAS
+app.post('/api/admin/fondos', async (req, res) => {
+    const { adminCode, targetPin, monto } = req.body;
+    try {
+        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
+        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
+        const [targetUser] = await db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [targetPin]);
+        if(targetUser.length === 0) return res.status(404).json({ error: "Usuario inexistente" });
+        const nuevoSaldo = parseFloat(targetUser[0].saldo) + parseFloat(monto);
+        await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, targetPin]);
+        res.json({ message: "Fondos acreditados", nuevoSaldo });
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+// 6. CONTACTOS (CON ÚLTIMA CONEXIÓN)
+app.get('/api/contactos/:codigo', async (req, res) => {
+    try {
+        const [rows] = await db.query(`SELECT u.codigo, u.nombre, u.sexo, u.foto, u.ultima_conexion FROM contactos c JOIN usuarios u ON c.contacto_codigo = u.codigo WHERE c.usuario_codigo = ?`, [req.params.codigo]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+app.post('/api/contactos', async (req, res) => {
+    const { miCodigo, aliasContacto } = req.body;
+    try {
+        const [targetUser] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [aliasContacto]);
+        if(targetUser.length === 0) return res.status(404).json({ error: "Alias no encontrado." });
+        const codCont = targetUser[0].codigo;
+        if(miCodigo === codCont) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
+        await db.query('INSERT IGNORE INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codCont]);
+        await db.query('INSERT IGNORE INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [codCont, miCodigo]);
+        res.json({ message: "Conexión establecida." });
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+// 7. MENSAJERÍA (CON TICKS Y STATUS)
+app.get('/api/mensajes/:user1/:user2', async (req, res) => {
+    const { user1, user2 } = req.params;
+    try {
+        // Marcamos como leídos los mensajes que llegan a user1 desde user2
+        await db.query('UPDATE mensajes SET leido = 1 WHERE remitente_codigo = ? AND destinatario_codigo = ?', [user2, user1]);
+        // Actualizamos "pulso" de actividad del usuario que consulta
+        await db.query('UPDATE usuarios SET ultima_conexion = NOW() WHERE codigo = ?', [user1]);
+        
+        const [rows] = await db.query(`SELECT * FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?) ORDER BY fecha ASC`, [user1, user2, user2, user1]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+app.post('/api/mensajes', async (req, res) => {
+    const { remitente, destinatario, mensaje } = req.body;
+    try {
+        await db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [remitente, destinatario, mensaje]);
+        await db.query('INSERT IGNORE INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [remitente, destinatario]);
+        await db.query('INSERT IGNORE INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [destinatario, remitente]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+app.delete('/api/mensajes/:user1/:user2', async (req, res) => {
+    try {
+        await db.query('DELETE FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?)', [req.params.user1, req.params.user2, req.params.user2, req.params.user1]);
+        res.json({ message: "Historial borrado" });
+    } catch (err) { res.status(500).json({ error: "Error" }); }
+});
+
+// RESEÑAS
 app.get('/api/items/:id/resenas', async (req, res) => {
     try {
         const [rows] = await db.query(`SELECT r.*, u.nombre, u.foto FROM resenas r JOIN usuarios u ON r.usuario_codigo = u.codigo WHERE r.item_id = ? ORDER BY r.fecha DESC`, [req.params.id]);
         res.json(rows);
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
 app.post('/api/items/:id/resenas', async (req, res) => {
@@ -130,81 +187,9 @@ app.post('/api/items/:id/resenas', async (req, res) => {
         if(existe.length > 0) return res.status(400).json({ error: "Ya valoraste este elemento." });
         await db.query('INSERT INTO resenas (item_id, usuario_codigo, estrellas, comentario) VALUES (?, ?, ?, ?)', [req.params.id, usuario_codigo, estrellas, comentario]);
         res.json({ message: "Reseña guardada" });
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
+    } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// 7. FONDOS
-app.post('/api/admin/fondos', async (req, res) => {
-    const { adminCode, targetPin, monto } = req.body;
-    if(!targetPin || !monto) return res.status(400).json({ error: "Datos inválidos." });
-    try {
-        const [admin] = await db.query('SELECT rol FROM usuarios WHERE codigo = ?', [adminCode]);
-        if (admin.length === 0 || admin[0].rol !== 'admin') return res.status(403).json({ error: "No autorizado" });
-        const [targetUser] = await db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [targetPin]);
-        if(targetUser.length === 0) return res.status(404).json({ error: "No existe usuario." });
-        const nuevoSaldo = parseFloat(targetUser[0].saldo) + parseFloat(monto);
-        await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, targetPin]);
-        res.json({ message: `Fondos inyectados. Nuevo saldo: $${nuevoSaldo.toFixed(2)}` });
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
-});
-
-// 8. CONTACTOS Y AUTO-AMISTAD
-app.get('/api/contactos/:codigo', async (req, res) => {
-    try {
-        const [rows] = await db.query(`SELECT u.codigo, u.nombre, u.sexo, u.foto FROM contactos c JOIN usuarios u ON c.contacto_codigo = u.codigo WHERE c.usuario_codigo = ?`, [req.params.codigo]);
-        res.json(rows);
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
-});
-
-app.post('/api/contactos', async (req, res) => {
-    const { miCodigo, aliasContacto } = req.body;
-    try {
-        const [targetUser] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [aliasContacto]);
-        if(targetUser.length === 0) return res.status(404).json({ error: "Alias no encontrado." });
-        const codigoContacto = targetUser[0].codigo;
-        if(miCodigo === codigoContacto) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
-        
-        const [existe] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [miCodigo, codigoContacto]);
-        if(existe.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [miCodigo, codigoContacto]);
-        
-        const [existeInverso] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [codigoContacto, miCodigo]);
-        if(existeInverso.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [codigoContacto, miCodigo]);
-        
-        res.json({ message: "Contacto añadido. La conexión es mutua." });
-    } catch (err) { res.status(500).json({ error: "Error interno" }); }
-});
-
-// 9. MENSAJES E IMÁGENES
-app.get('/api/mensajes/:user1/:user2', async (req, res) => {
-    const { user1, user2 } = req.params;
-    try {
-        const [rows] = await db.query(`SELECT * FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?) ORDER BY fecha ASC`, [user1, user2, user2, user1]);
-        res.json(rows);
-    } catch (err) { res.status(500).json({ error: "Error de BD" }); }
-});
-
-app.post('/api/mensajes', async (req, res) => {
-    const { remitente, destinatario, mensaje } = req.body;
-    try {
-        await db.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [remitente, destinatario, mensaje]);
-        const [existeDest] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [destinatario, remitente]);
-        if(existeDest.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [destinatario, remitente]);
-        const [existeRem] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [remitente, destinatario]);
-        if(existeRem.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [remitente, destinatario]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Error enviando mensaje" }); }
-});
-
-// NUEVO: BORRAR CHAT
-app.delete('/api/mensajes/:user1/:user2', async (req, res) => {
-    const { user1, user2 } = req.params;
-    try {
-        await db.query('DELETE FROM mensajes WHERE (remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?)', [user1, user2, user2, user1]);
-        res.json({ message: "Historial eliminado exitosamente." });
-    } catch (err) { res.status(500).json({ error: "Error borrando chat" }); }
-});
-
-// 10. FOTO PERFIL
 app.post('/api/perfil/foto', async (req, res) => {
     try {
         await db.query('UPDATE usuarios SET foto = ? WHERE codigo = ?', [req.body.nuevaFoto, req.body.codigo]);
@@ -212,7 +197,6 @@ app.post('/api/perfil/foto', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// SERVIR ARCHIVOS Y FRONTEND
 app.use(express.static('public'));
 app.use((req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
