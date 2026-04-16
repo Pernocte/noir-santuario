@@ -114,6 +114,48 @@ app.post('/api/comprar', async (req, res) => {
         res.json({ message: `Compra exitosa: ${itemRows[0].nombre}`, nuevoSaldo: nuevoSaldo });
     } catch (err) { res.status(500).json({ error: "Error procesando compra" }); }
 });
+// ==========================================
+// NUEVO: CONTACTAR MODELOS (DESBLOQUEO VIP)
+// ==========================================
+app.post('/api/modelos/contactar', async (req, res) => {
+    const { codigoUsuario, modeloId } = req.body;
+    try {
+        // 1. Verificamos los fondos del usuario
+        const [userRows] = await db.query('SELECT saldo FROM usuarios WHERE codigo = ?', [codigoUsuario]);
+        const [itemRows] = await db.query('SELECT precio, nombre FROM items WHERE id = ?', [modeloId]);
+        
+        if (userRows.length === 0 || itemRows.length === 0) return res.status(404).json({ error: "Datos no encontrados." });
+        
+        const saldoActual = parseFloat(userRows[0].saldo);
+        const costo = parseFloat(itemRows[0].precio);
+
+        if (saldoActual < costo) return res.status(400).json({ error: "Fondos insuficientes para el contacto." });
+
+        // 2. Buscamos si la modelo tiene una cuenta real (El Alias debe coincidir con el Nombre)
+        const [modeloUser] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [itemRows[0].nombre]);
+        const nuevoSaldo = saldoActual - costo;
+
+        if (modeloUser.length === 0) {
+            // Si la modelo no tiene cuenta creada aún, se cobra pero se avisa al admin.
+            await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, codigoUsuario]);
+            return res.json({ message: `Pago exitoso. La administración gestionará pronto tu conexión con ${itemRows[0].nombre}.`, nuevoSaldo });
+        }
+
+        // 3. Si tiene cuenta, cobramos y los enlazamos mágicamente en el chat
+        await db.query('UPDATE usuarios SET saldo = ? WHERE codigo = ?', [nuevoSaldo, codigoUsuario]);
+        const modeloCodigo = modeloUser[0].codigo;
+        
+        const [existe] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [codigoUsuario, modeloCodigo]);
+        if(existe.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [codigoUsuario, modeloCodigo]);
+        
+        const [existeInv] = await db.query('SELECT id FROM contactos WHERE usuario_codigo = ? AND contacto_codigo = ?', [modeloCodigo, codigoUsuario]);
+        if(existeInv.length === 0) await db.query('INSERT INTO contactos (usuario_codigo, contacto_codigo) VALUES (?, ?)', [modeloCodigo, codigoUsuario]);
+
+        res.json({ message: `¡Acceso concedido! ${itemRows[0].nombre} ha sido añadida a tu Red Privada.`, nuevoSaldo });
+    } catch (err) {
+        res.status(500).json({ error: "Error procesando el contacto." });
+    }
+});
 
 // 6. RESEÑAS
 app.get('/api/items/:id/resenas', async (req, res) => {
