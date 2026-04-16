@@ -148,11 +148,10 @@
     </div>
 
     <div id="dashboard-view">
-        <nav class="nav-menu">
+       <nav class="nav-menu">
             <button class="nav-btn active" data-target="sec-evento">Evento</button>
             <button class="nav-btn" data-target="sec-modelos">Modelos</button>
-            <button class="nav-btn" data-target="sec-mercancia">Mercancía</button>
-            <button class="nav-btn" data-target="sec-juguetes">Juguetes</button>
+            <button class="nav-btn" data-target="sec-mercancia">Boutique</button>
             <button class="nav-btn" data-target="sec-perfil">Perfil</button>
             <button class="nav-btn admin-only-block" data-target="sec-admin">Crear Accesos</button>
             <button class="nav-btn" id="logout-btn" style="color:#ff4a4a;">Salir</button>
@@ -181,8 +180,19 @@
         </div>
 
         <div id="sec-modelos" class="section-content"><h2 style="font-family: var(--font-serif); color: var(--text-gold);">MODELOS</h2><button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('modelos')">+ AÑADIR NUEVA</button><div class="grid-layout" id="grid-modelos"></div></div>
-        <div id="sec-mercancia" class="section-content"><h2 style="font-family: var(--font-serif); color: var(--text-gold);">BOUTIQUE NOIR</h2><button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('mercancia')">+ AÑADIR NUEVA</button><div class="grid-layout" id="grid-mercancia"></div></div>
-        <div id="sec-juguetes" class="section-content"><h2 style="font-family: var(--font-serif); color: var(--text-gold);">COLECCIÓN PRIVADA</h2><button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('juguetes')">+ AÑADIR NUEVO</button><div class="grid-layout" id="grid-juguetes"></div></div>
+       <div id="sec-mercancia" class="section-content">
+            <h2 style="font-family: var(--font-serif); color: var(--text-gold);">BOUTIQUE NOIR</h2>
+            
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:10px; width:100%; justify-content:center;">
+                <button class="nav-btn sub-nav-btn active" data-subcat="juguetes" onclick="cambiarSubCategoria('juguetes', this)">Juguetes</button>
+                <button class="nav-btn sub-nav-btn" data-subcat="lenceria" onclick="cambiarSubCategoria('lenceria', this)">Lencería</button>
+                <button class="nav-btn sub-nav-btn" data-subcat="miscelaneo" onclick="cambiarSubCategoria('miscelaneo', this)">Misceláneo</button>
+            </div>
+
+            <button class="admin-add-btn admin-only-block" id="btn-add-boutique" onclick="abrirModalAgregar('juguetes')">+ AÑADIR A JUGUETES</button>
+            
+            <div class="grid-layout" id="grid-mercancia-dinamico"></div>
+        </div>
 
         <div id="sec-perfil" class="section-content">
             <div class="profile-header">
@@ -341,7 +351,9 @@
                             setTimeout(() => document.getElementById('dashboard-view').style.opacity = '1', 50);
                         }, 400);
 
-                        cargarEvento(); cargarItems('modelos'); cargarItems('mercancia'); cargarItems('juguetes');
+                        cargarEvento(); 
+                        cargarItems('modelos'); 
+                        cambiarSubCategoria('juguetes', document.querySelector('.sub-nav-btn[data-subcat="juguetes"]'));
                         switchTab('sec-evento');
                     } else {
                         document.getElementById('code-error').innerText = data.message; document.getElementById('code-error').style.display = 'block';
@@ -380,11 +392,34 @@
             });
 
             // --- CATÁLOGOS ---
+           // --- NUEVA FUNCIÓN PARA CAMBIAR PESTAÑAS EN LA BOUTIQUE ---
+            window.cambiarSubCategoria = function(categoria, btnElement) {
+                // Pintar el botón activo
+                document.querySelectorAll('.sub-nav-btn').forEach(btn => btn.classList.remove('active'));
+                if(btnElement) btnElement.classList.add('active');
+                
+                // Actualizar el botón de Admin para que sepa en qué categoría estamos
+                const adminBtn = document.getElementById('btn-add-boutique');
+                if(adminBtn) {
+                    adminBtn.setAttribute('onclick', `abrirModalAgregar('${categoria}')`);
+                    adminBtn.innerText = `+ AÑADIR A ${categoria.toUpperCase()}`;
+                }
+
+                // Cargar los items de la base de datos
+                cargarItems(categoria);
+            };
+
+            // --- ACTUALIZACIÓN DE CARGAR ITEMS ---
             async function cargarItems(categoria) {
                 const res = await fetch(`${API_URL}/items/${categoria}${antiCache()}`);
                 const items = await res.json();
-                const container = document.getElementById(`grid-${categoria}`); container.innerHTML = '';
                 
+                // Saber si lo mandamos a Modelos o a la Boutique
+                const gridId = categoria === 'modelos' ? 'grid-modelos' : 'grid-mercancia-dinamico';
+                const container = document.getElementById(gridId); 
+                if(!container) return;
+                
+                container.innerHTML = '';
                 items.forEach(item => {
                     const div = document.createElement('div'); div.className = 'grid-item';
                     const delBtnHTML = (currentUser.rol === 'admin') ? `<button class="del-btn admin-only-block" style="display:block;" onclick="borrarItem(${item.id}, '${categoria}', event)">X</button>` : '';
