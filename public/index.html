@@ -303,7 +303,12 @@
             <button id="confirm-add-item-btn" class="gold-button admin-inline-btn" style="margin-top: 10px;">GUARDAR EN CATÁLOGO</button>
         </div>
     </div>
-
+<div class="modal-overlay" id="photo-modal" style="z-index: 200;">
+        <div style="position: relative; max-width: 90%; max-height: 90%; display: flex; justify-content: center; align-items: center;">
+            <button onclick="document.getElementById('photo-modal').style.display='none'" style="position: absolute; top: -15px; right: -15px; background: #ff4a4a; color: #fff; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-weight: bold; font-size: 16px; z-index: 201; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">X</button>
+            <img id="full-photo-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 8px; border: 2px solid var(--text-gold); box-shadow: 0 10px 40px rgba(0,0,0,0.9); object-fit: contain;">
+        </div>
+    </div>
     <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO</div></div>
 
     <script>
@@ -408,30 +413,72 @@
                 cargarItems(categoria);
             };
 
-            // --- ACTUALIZACIÓN DE CARGAR ITEMS ---
+      // --- ACTUALIZACIÓN DE CARGAR ITEMS (SEPARANDO MODELOS DE BOUTIQUE) ---
             async function cargarItems(categoria) {
                 const res = await fetch(`${API_URL}/items/${categoria}${antiCache()}`);
                 const items = await res.json();
                 
-                // Saber si lo mandamos a Modelos o a la Boutique
                 const gridId = categoria === 'modelos' ? 'grid-modelos' : 'grid-mercancia-dinamico';
                 const container = document.getElementById(gridId); 
                 if(!container) return;
                 
                 container.innerHTML = '';
                 items.forEach(item => {
-                    const div = document.createElement('div'); div.className = 'grid-item';
+                    const div = document.createElement('div'); 
+                    div.className = 'grid-item';
                     const delBtnHTML = (currentUser.rol === 'admin') ? `<button class="del-btn admin-only-block" style="display:block;" onclick="borrarItem(${item.id}, '${categoria}', event)">X</button>` : '';
-                    const totalVotos = parseInt(item.total_resenas) || 0;
-                    const promedio = parseFloat(item.promedio_estrellas) || 0;
-                    const starText = totalVotos > 0 ? `★ ${promedio.toFixed(1)} (${totalVotos})` : `Sin valoraciones`;
-                    const precio = parseFloat(item.precio);
-                    const precioText = precio > 0 ? `<p class="item-price">$${precio.toFixed(2)}</p>` : '';
-                    div.innerHTML = `${delBtnHTML}<div class="grid-item-img" style="background-image: url(${item.imagen})"></div><h3 style="margin:0; font-size:14px; color:var(--text-gold); text-align:center;">${item.nombre}</h3>${precioText}<p class="item-stars-avg">${starText}</p>`;
-                    div.addEventListener('click', () => abrirModalItem(item, categoria));
+                    
+                    if (categoria === 'modelos') {
+                        // RENDERIZADO VIP (SÓLO MODELOS)
+                        div.innerHTML = `
+                            ${delBtnHTML}
+                            <div class="grid-item-img" style="background-image: url(${item.imagen}); cursor:pointer;" onclick="verFotoCompleta('${item.imagen}')"></div>
+                            <h3 style="margin:0 0 10px 0; font-size:16px; color:var(--text-gold); text-align:center; font-family:var(--font-serif);">${item.nombre}</h3>
+                            <div style="display:flex; gap:10px; width:100%; justify-content:center;">
+                                <button class="gold-button" style="padding:10px; margin:0;" onclick="verFotoCompleta('${item.imagen}')">VER FOTO</button>
+                                <button class="gold-button" style="padding:10px; margin:0; border-color:#27c93f; color:#27c93f;" onclick="contactarModelo(${item.id}, '${item.nombre}', ${item.precio})">CONTACTAR ($${item.precio})</button>
+                            </div>
+                        `;
+                    } else {
+                        // RENDERIZADO NORMAL BOUTIQUE (Con estrellas y precio abajo)
+                        const totalVotos = parseInt(item.total_resenas) || 0;
+                        const promedio = parseFloat(item.promedio_estrellas) || 0;
+                        const starText = totalVotos > 0 ? `★ ${promedio.toFixed(1)} (${totalVotos})` : `Sin valoraciones`;
+                        const precio = parseFloat(item.precio);
+                        const precioText = precio > 0 ? `<p class="item-price">$${precio.toFixed(2)}</p>` : '';
+                        
+                        div.innerHTML = `${delBtnHTML}<div class="grid-item-img" style="background-image: url(${item.imagen})"></div><h3 style="margin:0; font-size:14px; color:var(--text-gold); text-align:center;">${item.nombre}</h3>${precioText}<p class="item-stars-avg">${starText}</p>`;
+                        div.addEventListener('click', () => abrirModalItem(item, categoria));
+                    }
                     container.appendChild(div);
                 });
             }
+            // --- NUEVAS FUNCIONES EXCLUSIVAS PARA MODELOS ---
+            window.verFotoCompleta = function(url) {
+                document.getElementById('full-photo-img').src = url;
+                document.getElementById('photo-modal').style.display = 'flex';
+            };
+
+            window.contactarModelo = async function(id, nombre, precio) {
+                if(!confirm(`¿Deseas desbloquear el contacto privado con ${nombre} por $${precio}? Se descontará de tus fondos.`)) return;
+                try {
+                    const res = await fetch(`${API_URL}/modelos/contactar`, { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({ codigoUsuario: currentUser.codigo, modeloId: id }) 
+                    });
+                    const data = await res.json();
+                    if(res.ok) { 
+                        alert(data.message); 
+                        actualizarSaldoUI(data.nuevoSaldo); 
+                        // Actualizar la lista de contactos en vivo
+                        lastContactsHTML = '';
+                        cargarContactos();
+                    } else { 
+                        alert(`Error: ${data.error}`); 
+                    }
+                } catch(e) { alert("Error al procesar la solicitud."); }
+            };
             window.borrarItem = async function(id, categoria, event) {
                 event.stopPropagation();
                 if(confirm("¿Eliminar permanentemente?")) { await fetch(`${API_URL}/items/${id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({adminCode: currentUser.codigo})}); cargarItems(categoria); }
