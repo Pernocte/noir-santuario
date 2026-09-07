@@ -2,17 +2,25 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check server.js && node --check public/app.js",
+    "check:db": "node scripts/check-db.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "cors": "^2.8.6",
     "express": "^5.2.1",
     "mysql2": "^3.20.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
