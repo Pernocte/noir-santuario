@@ -32,6 +32,7 @@
             <button class="nav-btn active" data-target="sec-evento">Evento</button>
             <button class="nav-btn" data-target="sec-modelos">Modelos</button>
             <button class="nav-btn" data-target="sec-mercancia">Boutique</button>
+            <button class="nav-btn" data-target="sec-chat">Chat <span class="unread-total" hidden></span></button>
             <button class="nav-btn" data-target="sec-perfil">Perfil</button>
             <button class="nav-btn admin-only-block" data-target="sec-admin">Crear Accesos</button>
             <button class="nav-btn" id="logout-btn" style="color:#ff4a4a;">Salir</button>
@@ -70,7 +71,7 @@
 
             <button class="admin-add-btn admin-only-block" id="btn-add-boutique" onclick="abrirModalAgregar('juguetes')">+ AÑADIR A JUGUETES</button>
             
-            <div class="grid-layout" id="grid-mercancia-dinamico"></div>
+            <div class="catalog-toolbar"><input type="search" id="catalog-search" class="input-field" placeholder="Buscar productos…" aria-label="Buscar productos"><button id="refresh-catalog-btn" class="subtle-button">Actualizar</button></div><div class="grid-layout" id="grid-mercancia-dinamico"></div>
         </div>
 
         <div id="sec-perfil" class="section-content">
@@ -83,17 +84,21 @@
                 <label for="update-photo-input" class="change-photo-label">Actualizar Fotografía</label>
             </div>
             
-            <h3 style="font-family: var(--font-serif); color: var(--text-gold); align-self: flex-start; margin-left: 5%;">RED PRIVADA</h3>
+            <div class="profile-nick"><span>Tu nick para conectar</span><strong id="my-nick"></strong><button id="copy-nick-btn" class="subtle-button">Copiar nick</button></div>
+            <button class="gold-button profile-chat-link" data-open-chat>Ir a mis conversaciones →</button>
+        </div>
+        <div id="sec-chat" class="section-content">
+            <div class="section-heading"><div><p class="eyebrow">TU CÍRCULO PRIVADO</p><h2>Conversaciones</h2></div><span class="soft-label">Solo entre amigos</span></div>
             <div class="social-chat-container">
                 
                 <div class="chat-sidebar" id="mobile-sidebar">
                     <div class="chat-sidebar-header">
-                        <h3 style="font-family: var(--font-serif); color: var(--text-gold); margin: 0;">Contactos</h3>
+                        <h3 style="font-family: var(--font-serif); color: var(--text-gold); margin: 0;">Mensajes</h3>
                         <div>
-                            <button id="add-contact-btn" class="chat-btn-icon">+</button>
+                            <button id="add-contact-btn" class="add-friend-button" aria-label="Agregar amigo">+ Amigo</button>
                         </div>
                     </div>
-                    <div class="contact-list" id="contact-list-container"></div>
+                    <div class="contact-search"><input id="contact-search" type="search" placeholder="Buscar conversación…" aria-label="Buscar conversación"></div><div class="contact-list" id="contact-list-container"></div>
                 </div>
 
                 <div class="chat-main" id="mobile-chat-main">
@@ -106,19 +111,20 @@
                                 <p id="active-chat-status" style="margin: 0; font-size: 10px; color: #888; display:none;">Red privada &bull; Desconectado</p>
                             </div>
                         </div>
-                        <button id="delete-chat-btn" class="chat-btn-icon" style="color: #ff4a4a; display: none;" title="Borrar historial completo">🗑️</button>
+                        <button id="delete-chat-btn" class="chat-btn-icon" style="color: #ff4a4a; display: none;" title="Borrar historial completo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
                     </div>
                     
                     <div class="chat-messages" id="chat-box">
-                        <div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Selecciona un contacto para chatear.</div>
+                        <div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Tu próxima conversación empieza aquí. Agrega un amigo por su nick.</div>
                     </div>
                     
+                    <div id="attachment-preview" hidden><img id="attachment-image" alt="Foto que vas a enviar"><div><strong>Foto lista</strong><span id="attachment-size"></span></div><button id="remove-attachment-btn" aria-label="Quitar foto">✕</button></div>
                     <div class="chat-input-area">
                         <input type="file" id="chat-img-input" accept="image/*">
-                        <button id="chat-img-btn" class="chat-btn-icon" disabled title="Enviar Imagen">📷</button>
+                        <button id="chat-img-btn" class="chat-btn-icon" disabled title="Enviar Imagen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></svg></button>
                         
-                        <input type="text" id="chat-input" class="input-field" placeholder="Escribe un mensaje..." disabled>
-                        <button id="send-msg-btn" class="chat-send-btn" disabled>></button>
+                        <textarea id="chat-input" class="input-field" rows="1" maxlength="10000" aria-label="Mensaje" placeholder="Escribe un mensaje…" disabled></textarea>
+                        <button id="send-msg-btn" class="chat-send-btn" disabled aria-label="Enviar mensaje">➤</button>
                     </div>
                 </div>
             </div>
@@ -154,18 +160,18 @@
                     <button id="buy-item-btn" class="gold-button" style="display:none; margin-bottom: 20px; background-color: #1a150c;">ADQUIRIR PRODUCTO</button>
                 </div>
                 <div class="modal-right">
-                    <h3 style="color:var(--text-gold); margin:0 0 10px 0;">Valoraciones</h3>
+                    <h3 style="color:var(--text-gold); margin:0 0 10px 0;">Opiniones de la comunidad</h3><p id="rating-summary" class="rating-summary"></p>
                     <div class="comments-list" id="modal-comments"></div>
                     <div id="review-form-container" style="background:#111; padding:15px; border-radius:4px; border:1px solid #333;">
-                        <div class="star-rating">
-                            <input type="radio" id="star5" name="rating" value="5"><label for="star5">★</label>
-                            <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
-                            <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
-                            <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
-                            <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
+                        <p class="rating-instruction">¿Qué te pareció? Toca una estrella.</p><div class="star-rating" role="radiogroup" aria-label="Puntuación del producto">
+                            <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 de 5 estrellas">★</label>
+                            <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 de 5 estrellas">★</label>
+                            <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 de 5 estrellas">★</label>
+                            <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 de 5 estrellas">★</label>
+                            <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 de 5 estrellas">★</label>
                         </div>
-                        <textarea id="my-comment-text" class="input-field" placeholder="Añadir valoración..." rows="2"></textarea>
-                        <button id="submit-review-btn" class="gold-button" style="padding: 10px; margin-top:10px;">PUBLICAR</button>
+                        <p id="rating-caption" class="rating-caption" aria-live="polite">Elige de 1 a 5 estrellas</p><textarea id="my-comment-text" class="input-field" placeholder="Cuéntanos tu experiencia (opcional)…" maxlength="5000" rows="2"></textarea>
+                        <button id="submit-review-btn" class="gold-button" style="padding: 10px; margin-top:10px;">Publicar mi opinión</button>
                     </div>
                     <div id="already-reviewed-msg" style="display:none; text-align:center; color:var(--text-gold); font-size:12px; padding:15px; border:1px solid #333; border-radius:4px; background:#111;">Ya has valorado esto.</div>
                 </div>
@@ -191,6 +197,17 @@
     </div>
     <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO</div></div>
 
+    <nav id="mobile-nav" aria-label="Navegación principal" hidden>
+      <button data-target="sec-evento"><span>☽</span>Inicio</button><button data-target="sec-modelos"><span>♧</span>Modelos</button><button data-target="sec-mercancia"><span>◇</span>Boutique</button><button data-target="sec-chat"><span>◌<b class="unread-total" hidden></b></span>Chat</button><button data-target="sec-perfil"><span>○</span>Perfil</button>
+    </nav>
+    <div id="toast-region" role="status" aria-live="polite"></div>
+    <dialog id="friend-dialog" class="noir-dialog">
+      <button id="close-friend-btn" class="dialog-close" aria-label="Cerrar">✕</button>
+      <p class="eyebrow">HAZ CRECER TU CÍRCULO</p><h2>Agregar un amigo</h2><p class="dialog-help">Escribe su nick exacto. No necesitas su PIN.</p>
+      <form id="friend-search-form"><label for="friend-nick" class="input-label">Nick del usuario</label><div class="nick-search"><input id="friend-nick" class="input-field" maxlength="255" placeholder="@nick" autocomplete="off" required><button id="find-friend-btn" class="gold-button">Buscar</button></div></form>
+      <div id="friend-result" aria-live="polite"></div>
+    </dialog>
+    <dialog id="confirm-dialog" class="noir-dialog"><h2>Confirmar</h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel" class="subtle-button">Cancelar</button><button id="confirm-accept" class="gold-button">Confirmar</button></div></dialog>
     <script src="/app.js" defer></script>
 </body>
 </html>

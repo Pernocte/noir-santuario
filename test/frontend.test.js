@@ -32,7 +32,7 @@ async function fixture(t, handler) {
     window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
     const $ = id => window.document.getElementById(id);
     $('access-code').value = 'test'; $('verify-btn').click(); await tick();
-    return { window, $, alerts, calls, profile: async () => { window.document.querySelector('[data-target="sec-perfil"]').click(); await tick(); }, open: async id => { window.document.querySelector(`[data-codigo="${id}"]`).click(); await tick(); } };
+    return { window, $, alerts, calls, profile: async () => { window.document.querySelector('[data-target="sec-chat"]').click(); await tick(); }, open: async id => { window.document.querySelector(`[data-codigo="${id}"]`).click(); await tick(); } };
 }
 test('slow old gallery response cannot overwrite the selected category', async t => {
     const slow = deferred();
@@ -58,11 +58,11 @@ test('slow chat A never appears in chat B', async t => {
     slow.resolve({ state: [{ id: 10, leido: 0 }], messages: [{ id: 10, mensaje: 'Ana only', remitente_codigo: '2', leido: 0 }] }); await tick();
     assert.match(f.$('chat-box').textContent, /Bea only/); assert.ok(!f.$('chat-box').textContent.includes('Ana only'));
 });
-test('failed send restores draft and never renders a confirmed message', async t => {
+test('failed send keeps a recoverable failed bubble with no confirmation tick', async t => {
     const f = await fixture(t, (route, options) => route.pathname === '/api/mensajes' && options.method === 'POST' ? new Response(JSON.stringify({ error: 'Send failed' }), { status: 500 }) : undefined);
     await f.profile(); await f.open('2'); f.$('chat-input').value = 'Keep this draft'; f.$('send-msg-btn').click(); await tick();
-    assert.equal(f.$('chat-input').value, 'Keep this draft'); assert.equal(f.$('chat-box').querySelectorAll('.msg-bubble').length, 0);
-    assert.ok(f.alerts.includes('Send failed')); assert.equal(f.$('send-msg-btn').disabled, false);
+    assert.match(f.$('chat-box').textContent, /Keep this draft/); assert.match(f.$('chat-box').textContent, /No se confirmó/); assert.equal(f.$('chat-box').querySelectorAll('.message-tick').length, 0);
+    assert.match(f.$('toast-region').textContent, /Send failed/); assert.equal(f.$('send-msg-btn').disabled, false);
 });
 test('read receipts update existing bubbles and text is inert', async t => {
     let reads = 0;
@@ -97,18 +97,52 @@ test('older history is prepended without losing recent messages', async t => {
     const button = f.window.document.querySelector('.load-older'); assert.equal(button.hidden, false); button.click(); await tick();
     assert.deepEqual([...f.$('chat-box').querySelectorAll('.message-text')].map(node => node.textContent), ['Older', 'Recent']); assert.equal(button.hidden, true);
 });
-test('image processing captures recipient and resets file input for repeat selection', async t => {
+test('switching chat discards the previous pending photo without sending to a new recipient', async t => {
     const sent = [];
     const f = await fixture(t, (route, options) => { if (route.pathname === '/api/mensajes' && options.method === 'POST') { sent.push(JSON.parse(options.body)); return { success: true }; } });
     const ready = deferred();
     f.window.URL.createObjectURL = () => 'blob:test'; f.window.URL.revokeObjectURL = () => {};
     f.window.Image = class { naturalWidth = 2000; naturalHeight = 1000; set src(value) { ready.promise.then(() => this.onload()); } };
     f.window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {} });
-    f.window.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,AAAA';
+    f.window.HTMLCanvasElement.prototype.toBlob = callback => callback(new f.window.Blob(['abc'], { type: 'image/jpeg' }));
     await f.profile(); await f.open('2');
     const file = new f.window.File(['test'], 'photo.jpg', { type: 'image/jpeg' });
     Object.defineProperty(f.$('chat-img-input'), 'files', { configurable: true, value: [file] });
     f.$('chat-img-input').dispatchEvent(new f.window.Event('change'));
     await f.open('3'); ready.resolve(); await tick();
-    assert.equal(sent.length, 1); assert.equal(sent[0].destinatario, '2'); assert.equal(f.$('chat-img-input').value, '');
+    assert.equal(sent.length, 0); assert.equal(f.$('attachment-preview').hidden, true); assert.equal(f.$('chat-img-input').value, '');
+});
+test('gallery cache avoids repeated loads and explicit refresh fetches again', async t => {
+    const f = await fixture(t, route => route.pathname === '/api/items/juguetes' ? [{ id: 1, nombre: 'Prueba', precio: 5, imagen: '/full.png', miniatura: '/thumb.webp' }] : undefined);
+    f.window.document.querySelector('[data-target="sec-mercancia"]').click(); await tick();
+    assert.equal(f.$('grid-mercancia-dinamico').querySelector('img').getAttribute('src'), '/thumb.webp');
+    await f.profile(); f.window.document.querySelector('[data-target="sec-mercancia"]').click(); await tick();
+    assert.equal(f.calls.filter(([route]) => route === '/api/items/juguetes').length, 1);
+    f.$('refresh-catalog-btn').click(); await tick(); assert.equal(f.calls.filter(([route]) => route === '/api/items/juguetes').length, 2);
+});
+test('friend nick lookup adds only the selected user and opens conversation', async t => {
+    const f = await fixture(t, route => route.pathname === '/api/usuarios/buscar' ? { codigo: '3', nombre: 'Bea', foto: '/b.png' } : undefined);
+    await f.profile(); f.$('add-contact-btn').click(); f.$('friend-nick').value = '@Bea';
+    f.$('friend-search-form').dispatchEvent(new f.window.Event('submit', { cancelable: true })); await tick();
+    assert.match(f.$('friend-result').textContent, /Agregar y conversar/);
+    f.$('friend-result').querySelector('button').click(); await tick();
+    const post = f.calls.find(([route, opts]) => route === '/api/contactos' && opts.method === 'POST');
+    assert.equal(JSON.parse(post[1].body).aliasContacto, 'Bea'); assert.equal(f.$('active-chat-name').textContent, 'Bea');
+});
+test('unread badges, previews and conversation filtering use contact data', async t => {
+    const f = await fixture(t, route => route.pathname === '/api/contactos/1' ? [{ codigo: '2', nombre: 'Ana', no_leidos: 4, ultimo_mensaje: 'Hasta mañana' }, { codigo: '3', nombre: 'Bea', no_leidos: 0 }] : undefined);
+    await f.profile(); assert.equal(f.window.document.querySelector('.unread-total').textContent, '4'); assert.match(f.$('contact-list-container').textContent, /Hasta mañana/);
+    f.$('contact-search').value = 'bea'; f.$('contact-search').dispatchEvent(new f.window.Event('input'));
+    assert.equal(f.window.document.querySelector('[data-codigo="2"]').hidden, true); assert.equal(f.window.document.querySelector('[data-codigo="3"]').hidden, false);
+});
+test('rating can be submitted with stars only and no comment', async t => {
+    const f = await fixture(t, (route, options) => {
+        if (route.pathname === '/api/items/juguetes') return [{ id: 1, nombre: 'Producto', precio: 5, imagen: '/p.png' }];
+        if (route.pathname.endsWith('/resenas')) return options.method === 'POST' ? { message: 'OK' } : [];
+    });
+    f.window.document.querySelector('[data-target="sec-mercancia"]').click(); await tick();
+    f.window.document.querySelector('.rate-product-button').click(); await tick(); assert.equal(f.$('submit-review-btn').disabled, true);
+    f.$('star4').checked = true; f.$('star4').dispatchEvent(new f.window.Event('change')); f.$('submit-review-btn').click(); await tick();
+    const call = f.calls.find(([route, opts]) => route.endsWith('/resenas') && opts.method === 'POST');
+    assert.deepEqual(JSON.parse(call[1].body), { estrellas: 4, comentario: '' });
 });

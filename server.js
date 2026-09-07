@@ -4,6 +4,7 @@ const mysql = require('mysql2/promise');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
+const sharp = require('sharp');
 
 const categories = new Set(['modelos', 'mercancia', 'juguetes', 'lenceria', 'miscelaneo']);
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -56,6 +57,8 @@ function createApp(db, options = {}) {
     const app = express();
     const secret = options.sessionSecret || process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
     const presence = new Map();
+    const mediaCache = new Map();
+    let mediaBytes = 0;
     const loginAttempts = new Map();
     const sign = value => crypto.createHmac('sha256', secret).update(value).digest('base64url');
     app.disable('x-powered-by');
@@ -115,6 +118,10 @@ function createApp(db, options = {}) {
         const columns = { items: ['items', 'imagen'], usuarios: ['usuarios', 'foto'] };
         const spec = columns[req.params.type];
         if (!spec) throw fail(404, 'Imagen no encontrada.');
+        const variant = ['thumb', 'avatar'].includes(req.query.size) ? req.query.size : 'full';
+        const cacheKey = `${req.params.type}:${req.params.id}:${variant}`;
+        const cached = mediaCache.get(cacheKey);
+        if (cached && cached.until > Date.now()) return res.set('Cache-Control', 'private, max-age=60').type(cached.type).send(cached.buffer);
         const [rows] = await db.query(`SELECT ${spec[1]} AS image FROM ${spec[0]} WHERE id = ?`, [req.params.id]);
         const value = rows[0]?.image;
         const match = typeof value === 'string' && value.match(/^data:image\/(jpeg|png|webp|gif);base64,([\s\S]+)$/);
@@ -123,7 +130,22 @@ function createApp(db, options = {}) {
             // A neutral avatar/image keeps missing legacy photos from breaking the layout.
             return res.type('svg').send('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#222"/><text x="100" y="115" fill="#c6ac71" text-anchor="middle" font-size="45">☽</text></svg>');
         }
-        res.set('Cache-Control', 'private, max-age=60').type(`image/${match[1]}`).send(Buffer.from(match[2], 'base64'));
+        let buffer = Buffer.from(match[2], 'base64'), type = `image/${match[1]}`;
+        if (variant !== 'full') {
+            try {
+                buffer = await sharp(buffer, { limitInputPixels: 40000000 }).rotate().resize(variant === 'avatar' ? 96 : 440, variant === 'avatar' ? 96 : 440, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 72 }).toBuffer();
+                type = 'image/webp';
+            } catch { /* Legacy malformed/unsupported images keep the existing fallback behavior. */ }
+        }
+        const previous = mediaCache.get(cacheKey);
+        if (previous) { mediaBytes -= previous.buffer.length; mediaCache.delete(cacheKey); }
+        if (buffer.length < 4 * 1024 * 1024) {
+            while (mediaCache.size && (mediaBytes + buffer.length > 24 * 1024 * 1024 || mediaCache.size >= 120)) {
+                const key = mediaCache.keys().next().value; mediaBytes -= mediaCache.get(key).buffer.length; mediaCache.delete(key);
+            }
+            mediaCache.set(cacheKey, { buffer, type, until: Date.now() + 60000 }); mediaBytes += buffer.length;
+        }
+        res.set('Cache-Control', 'private, max-age=60').type(type).send(buffer);
     });
     app.get('/api/evento', async (req, res) => {
         const [rows] = await db.query('SELECT * FROM evento WHERE id = 1');
@@ -138,7 +160,7 @@ function createApp(db, options = {}) {
     app.get('/api/items/:categoria', async (req, res) => {
         if (!categories.has(req.params.categoria)) throw fail(400, 'Categoría inválida.');
         const [rows] = await db.query(`SELECT i.id, i.categoria, i.nombre, i.precio, COALESCE(r.total_resenas, 0) AS total_resenas, r.promedio_estrellas FROM items i LEFT JOIN (SELECT item_id, COUNT(*) AS total_resenas, AVG(estrellas) AS promedio_estrellas FROM resenas GROUP BY item_id) r ON r.item_id = i.id WHERE i.categoria = ? ORDER BY i.id DESC`, [req.params.categoria]);
-        res.json(rows.map(item => ({ ...item, imagen: `/api/media/items/${item.id}` })));
+        res.json(rows.map(item => ({ ...item, imagen: `/api/media/items/${item.id}`, miniatura: `/api/media/items/${item.id}?size=thumb` })));
     });
     app.post('/api/items', admin, async (req, res) => {
         const { categoria, nombre, imagen, precio = 0 } = req.body;
@@ -215,13 +237,26 @@ function createApp(db, options = {}) {
         });
         res.json({ message: 'Reseña guardada.' });
     });
+    app.get('/api/usuarios/buscar', async (req, res) => {
+        const nick = String(req.query.nick || '').trim().replace(/^@/, '');
+        if (!text(nick)) throw fail(400, 'Escribe el nick del usuario.');
+        const [rows] = await db.query('SELECT id, nombre FROM usuarios WHERE nombre = ?', [nick]);
+        if (!rows.length) throw fail(404, 'No encontramos ese nick. Revisa cómo está escrito.');
+        if (rows.length > 1) throw fail(409, 'Ese nick está duplicado. Pide a administración que lo revise.');
+        if (String(rows[0].id) === String(req.user.id)) throw fail(400, 'Ese es tu propio nick. Busca el de un amigo.');
+        res.json({ codigo: String(rows[0].id), nombre: rows[0].nombre, foto: `/api/media/usuarios/${rows[0].id}?size=avatar` });
+    });
     app.get('/api/contactos/:codigo', own, async (req, res) => {
-        const [rows] = await db.query('SELECT DISTINCT u.id, u.nombre, u.sexo FROM contactos c JOIN usuarios u ON c.contacto_codigo = u.codigo WHERE c.usuario_codigo = ? ORDER BY u.nombre, u.id', [req.user.codigo]);
-        res.json(rows.map(row => ({ ...row, codigo: String(row.id), foto: `/api/media/usuarios/${row.id}`, ultima_conexion: presence.has(String(row.id)) ? new Date(presence.get(String(row.id))).toISOString() : null })));
+        const [rows] = await db.query(`SELECT DISTINCT u.id, u.nombre, u.sexo,
+            (SELECT COUNT(*) FROM mensajes unread WHERE unread.remitente_codigo = u.codigo AND unread.destinatario_codigo = ? AND unread.leido = 0) AS no_leidos,
+            (SELECT IF(LEFT(m.mensaje, 10) = 'data:image', '📷 Foto', LEFT(m.mensaje, 100)) FROM mensajes m WHERE (m.remitente_codigo = u.codigo AND m.destinatario_codigo = ?) OR (m.remitente_codigo = ? AND m.destinatario_codigo = u.codigo) ORDER BY m.id DESC LIMIT 1) AS ultimo_mensaje,
+            (SELECT MAX(m.fecha) FROM mensajes m WHERE (m.remitente_codigo = u.codigo AND m.destinatario_codigo = ?) OR (m.remitente_codigo = ? AND m.destinatario_codigo = u.codigo)) AS ultimo_fecha
+            FROM contactos c JOIN usuarios u ON c.contacto_codigo = u.codigo WHERE c.usuario_codigo = ? ORDER BY ultimo_fecha DESC, u.nombre, u.id`, Array(6).fill(req.user.codigo));
+        res.json(rows.map(row => ({ ...row, codigo: String(row.id), foto: `/api/media/usuarios/${row.id}?size=avatar`, ultima_conexion: presence.has(String(row.id)) ? new Date(presence.get(String(row.id))).toISOString() : null })));
     });
     app.post('/api/contactos', async (req, res) => {
         if (!text(req.body.aliasContacto)) throw fail(400, 'Ingresa un alias.');
-        const [rows] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [req.body.aliasContacto.trim()]);
+        const [rows] = await db.query('SELECT codigo FROM usuarios WHERE nombre = ?', [req.body.aliasContacto.trim().replace(/^@/, '')]);
         if (!rows.length) throw fail(404, 'Alias no encontrado.');
         if (rows.length > 1) throw fail(409, 'Alias duplicado. Solicita su corrección a administración.');
         await transaction(db, connection => linkUsers(connection, req.user.codigo, rows[0].codigo));
@@ -264,6 +299,7 @@ function createApp(db, options = {}) {
     });
     app.post('/api/perfil/foto', async (req, res) => {
         await db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [imageData(req.body.nuevaFoto), req.user.id]);
+        for (const [key, value] of mediaCache) if (key.startsWith(`usuarios:${req.user.id}:`)) { mediaBytes -= value.buffer.length; mediaCache.delete(key); }
         res.json({ success: true });
     });
     app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));

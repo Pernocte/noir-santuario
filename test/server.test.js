@@ -104,3 +104,16 @@ test('transaction retries deadlock and releases both connections', async () => {
     const value = await transaction(db, async () => { if (++runs === 1) throw Object.assign(new Error(), { code: 'ER_LOCK_DEADLOCK' }); return 42; });
     assert.equal(value, 42); assert.equal(releases, 2);
 });
+test('nick lookup normalizes @ and returns public friend identity', async t => {
+    const f = await fixture(t, (sql, args) => { if (sql === 'SELECT id, nombre FROM usuarios WHERE nombre = ?') { assert.equal(args[0], 'Amiga'); return [[{ id: 2, nombre: 'Amiga' }]]; } return [[]]; });
+    const res = await f.request('/api/usuarios/buscar?nick=%40Amiga'); assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { codigo: '2', nombre: 'Amiga', foto: '/api/media/usuarios/2?size=avatar' });
+});
+test('thumbnail is resized and cache avoids repeating database image reads', async t => {
+    const sharp = require('sharp'); const source = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#c6ac71' } }).png().toBuffer();
+    let reads = 0;
+    const f = await fixture(t, sql => { if (sql.startsWith('SELECT imagen AS image')) { reads++; return [[{ image: `data:image/png;base64,${source.toString('base64')}` }]]; } return [[]]; });
+    const res = await f.request('/api/media/items/7?size=thumb'); assert.equal(res.status, 200); assert.match(res.headers.get('content-type'), /image\/webp/);
+    const bytes = Buffer.from(await res.arrayBuffer()); const meta = await sharp(bytes).metadata(); assert.equal(meta.width, 440); assert.equal(meta.height, 330);
+    assert.ok(bytes.length < source.length); await f.request('/api/media/items/7?size=thumb'); assert.equal(reads, 1);
+});
