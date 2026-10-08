@@ -279,6 +279,62 @@ function createApp(db, options = {}) {
         });
         res.json(result);
     });
+
+    // Separate binary media avoids the 64 KB TEXT ceiling in legacy mensajes.
+    // Additive table only: existing user/message tables are untouched.
+    let chatMediaInit;
+    function ensureChatMedia() {
+        if (!chatMediaInit) chatMediaInit = db.query(`CREATE TABLE IF NOT EXISTS noir_chat_media (
+            message_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            mime VARCHAR(32) NOT NULL,
+            content MEDIUMBLOB NOT NULL,
+            expires_at DATETIME NULL,
+            INDEX idx_noir_chat_expiration (expires_at)
+        ) ENGINE=InnoDB`).catch(error => { chatMediaInit = null; throw error; });
+        return chatMediaInit;
+    }
+    app.post('/api/mensajes/foto', async (req, res) => {
+        const other = await recipient(req.body.destinatario);
+        const duration = Number(req.body.duration || 0);
+        if (![0, 3600, 86400].includes(duration)) throw fail(400, 'Duración de foto inválida.');
+        const raw = imageData(req.body.imagen);
+        const match = raw.match(/^data:image\/(jpeg|png|webp|gif);base64,([\s\S]+)$/);
+        if (!match) throw fail(400, 'Foto inválida.');
+        let bytes = Buffer.from(match[2], 'base64');
+        if (bytes.length > 9 * 1024 * 1024) throw fail(413, 'La imagen es demasiado grande.');
+        let mime = 'image/' + match[1];
+        // Convert still images to a compact, phone-friendly WebP without flattening GIF animations.
+        if (match[1] !== 'gif') {
+            bytes = await sharp(bytes, { limitInputPixels: 24000000 }).rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true }).webp({ quality: 77 }).toBuffer();
+            mime = 'image/webp';
+        }
+        if (bytes.length > 9 * 1024 * 1024) throw fail(413, 'La foto supera el límite permitido.');
+        await ensureChatMedia();
+        const expires = duration ? new Date(Date.now() + duration * 1000) : null;
+        const result = await transaction(db, async connection => {
+            await linkUsers(connection, req.user.codigo, other.codigo);
+            const [row] = await connection.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [req.user.codigo, other.codigo, '[NOIR_FOTO]']);
+            await connection.query('INSERT INTO noir_chat_media (message_id, mime, content, expires_at) VALUES (?, ?, ?, ?)', [row.insertId, mime, bytes, expires]);
+            return row;
+        });
+        res.json({ success: true, id: result.insertId });
+    });
+    app.get('/api/mensajes/foto/:id', async (req, res) => {
+        if (!/^\d+$/.test(req.params.id)) throw fail(400, 'Foto inválida.');
+        await ensureChatMedia();
+        const [rows] = await db.query(`SELECT m.remitente_codigo, m.destinatario_codigo, c.mime, c.content, c.expires_at
+            FROM noir_chat_media c JOIN mensajes m ON m.id = c.message_id WHERE c.message_id = ?`, [req.params.id]);
+        const photo = rows[0];
+        if (!photo) throw fail(404, 'Foto no disponible.');
+        if (photo.remitente_codigo !== req.user.codigo && photo.destinatario_codigo !== req.user.codigo) throw fail(403, 'No autorizado.');
+        if (photo.expires_at && new Date(photo.expires_at).getTime() <= Date.now()) {
+            await db.query('DELETE FROM noir_chat_media WHERE message_id = ?', [req.params.id]);
+            throw fail(410, 'Esta fotografía ha caducado.');
+        }
+        res.set('Cache-Control', 'private, no-store');
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.type(photo.mime).send(photo.content);
+    });
     app.post('/api/mensajes', async (req, res) => {
         const { destinatario, mensaje } = req.body;
         if (typeof mensaje !== 'string' || !mensaje.trim()) throw fail(400, 'Mensaje vacío.');
