@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const img = image('/api/mensajes/foto/' + encodeURIComponent(message.id), 'msg-image', 'Fotografía privada');
             img.loading = 'eager'; img.onclick = () => verFotoCompleta(img.src);
             bubble.append(img);
-        } else if (/^data:image\\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(message.mensaje)) {
+        } else if (/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(message.mensaje)) {
             const img = image(message.mensaje, 'msg-image', 'Imagen de chat'); img.loading = 'eager';
             img.onclick = () => verFotoCompleta(message.mensaje);
             img.onload = () => { const box = $('chat-box'); if (bubble.dataset.keepBottom === '1') box.scrollTop = box.scrollHeight; };
