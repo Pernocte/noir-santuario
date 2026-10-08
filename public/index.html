@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="/styles.css?v=20261008-3">
-    <link rel="stylesheet" href="/noir-2.css?v=20261008-3">
+    <link rel="stylesheet" href="/noir-2.css?v=20261008-4">
 </head>
 <body>
 
@@ -39,14 +39,14 @@
             <button class="nav-btn admin-only-block" data-target="sec-admin">Crear Accesos</button>
             <button class="nav-btn" id="logout-btn" style="color:#ff4a4a;">Salir</button>
         </nav>
-        <div id="sec-evento" class="section-content active">
-            <div class="content-card" id="event-display-mode">
+        <div id="sec-evento" class="section-content active"><div class="noir-editorial-kicker">NOIR / ENCUENTROS PRIVADOS — LA PAZ</div>
+            <div class="content-card noir-event-hero" id="event-display-mode"><div class="noir-hero-ornament" aria-hidden="true"><div class="noir-hero-arch"><span>NOIR</span><small>SANTUARIO PRIVADO</small></div></div><div class="noir-event-copy">
                 <h2 id="ev-titulo" style="font-family: var(--font-serif); color: var(--text-gold); font-size: 24px; text-transform: uppercase;">CARGANDO...</h2>
                 <p id="ev-fecha" style="font-size: 30px; margin: 10px 0;"></p>
                 <p id="ev-hora" style="font-size: 18px; color: var(--text-gold);"></p>
                 <hr style="border-color: #222; margin: 30px 0;">
                 <p id="ev-desc" style="font-size: 12px; color: #888;"></p>
-                <button id="btn-edit-event" class="gold-button admin-inline-btn admin-only-block">EDITAR INFORMACIÓN DEL EVENTO</button>
+                <button id="btn-edit-event" class="gold-button admin-inline-btn admin-only-block">EDITAR INFORMACIÓN DEL EVENTO</button></div>
             </div>
             <div class="content-card" id="event-edit-mode" style="display: none; border-color: #ff4a4a;">
                 <h2 style="color: #ff4a4a; margin-bottom: 20px;">MODO EDICIÓN (ADMIN)</h2>
@@ -61,9 +61,9 @@
             </div>
         </div>
 
-        <div id="sec-modelos" class="section-content"><h2 style="font-family: var(--font-serif); color: var(--text-gold);">MODELOS</h2><button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('modelos')">+ AÑADIR NUEVA</button><div class="grid-layout" id="grid-modelos"></div></div>
+        <div id="sec-modelos" class="section-content"><div class="noir-section-intro"><span class="noir-editorial-kicker">EL CÍRCULO / PRESENCIAS</span><h2>Rostros del Santuario</h2><p>Una colección de encuentros, historias y conexiones privadas.</p></div><button class="admin-add-btn admin-only-block" onclick="abrirModalAgregar('modelos')">+ AÑADIR NUEVA</button><div class="grid-layout" id="grid-modelos"></div></div>
       <div id="sec-mercancia" class="section-content">
-            <h2 style="font-family: var(--font-serif); color: var(--text-gold);">BOUTIQUE NOIR</h2>
+            <div class="noir-section-intro"><span class="noir-editorial-kicker">COLECCIÓN PRIVADA / NOIR</span><h2>La Boutique</h2><p>Piezas elegidas para quienes aprecian los detalles.</p></div><div class="noir-boutique-feature"><div class="noir-boutique-feature-copy"><span class="noir-editorial-kicker">THE NOIR EDIT</span><h3>El arte de lo exclusivo</h3><p>Explora nuestra selección privada.</p><span class="noir-feature-link">DESCUBRE LA COLECCIÓN <span aria-hidden="true">↗</span></span></div><div id="noir-feature-art" class="noir-feature-art" aria-hidden="true"><span>NOIR</span></div></div>
             
             <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:10px; width:100%; justify-content:center;">
                 <button class="nav-btn sub-nav-btn active" data-subcat="juguetes" onclick="cambiarSubCategoria('juguetes', this)">Juguetes</button>
@@ -197,7 +197,7 @@
             <img id="full-photo-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 8px; border: 2px solid var(--text-gold); box-shadow: 0 10px 40px rgba(0,0,0,0.9); object-fit: contain;">
         </div>
     </div>
-    <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO · v2.1</div></div>
+    <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO · v2.2</div></div>
 
     <nav id="mobile-nav" aria-label="Navegación principal" hidden>
       <button data-target="sec-evento"><span>☽</span>Inicio</button><button data-target="sec-modelos"><span>♧</span>Modelos</button><button data-target="sec-mercancia"><span>◇</span>Boutique</button><button data-target="sec-chat"><span>◌<b class="unread-total" hidden></b></span>Chat</button><button data-target="sec-perfil"><span>○</span>Perfil</button>
@@ -210,6 +210,6 @@
       <div id="friend-result" aria-live="polite"></div>
     </dialog>
     <dialog id="confirm-dialog" class="noir-dialog"><h2>Confirmar</h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel" class="subtle-button">Cancelar</button><button id="confirm-accept" class="gold-button">Confirmar</button></div></dialog>
-    <script src="/app.js?v=20261008-3" defer></script>
+    <script src="/app.js?v=20261008-4" defer></script>
 </body>
 </html>
