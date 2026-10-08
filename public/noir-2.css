@@ -215,3 +215,10 @@ button{touch-action:manipulation}
  .noir-countdown-grid strong{font-size:clamp(24px,6vw,35px)}
  .noir-countdown-grid small{font-size:8px;letter-spacing:.035em}
 }
+
+/* NOIR 2.4 — private attachments */
+.noir-photo-expiry{display:flex;gap:7px;align-items:center;font-size:11px;color:#cdb88f;white-space:nowrap}
+.noir-photo-expiry select{background:#19191b;color:#ead9b8;border:1px solid #715a38;border-radius:8px;padding:8px;max-width:170px}
+#attachment-preview{flex-wrap:wrap;gap:9px}
+.msg-bubble .msg-image{object-fit:contain;max-height:360px;border-radius:12px}
+@media(max-width:768px){.noir-photo-expiry{width:100%;justify-content:space-between;white-space:normal}.noir-photo-expiry select{max-width:190px}.msg-bubble .msg-image{max-height:300px;max-width:100%}}
