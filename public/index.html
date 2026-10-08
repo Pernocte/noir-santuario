@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="/styles.css?v=20261008-3">
-    <link rel="stylesheet" href="/noir-2.css?v=20261008-5">
+    <link rel="stylesheet" href="/noir-2.css?v=20261008-6">
 </head>
 <body>
 
@@ -121,7 +121,7 @@
                         <div class="chat-placeholder" id="chat-placeholder"><div style="font-size: 40px; color: #222; margin-bottom: 10px;">☽</div>Tu próxima conversación empieza aquí. Agrega un amigo por su nick.</div>
                     </div>
                     
-                    <div id="attachment-preview" hidden><img id="attachment-image" alt="Foto que vas a enviar"><div><strong>Foto lista</strong><span id="attachment-size"></span></div><button id="remove-attachment-btn" aria-label="Quitar foto">✕</button></div>
+                    <div id="attachment-preview" hidden><img id="attachment-image" alt="Foto que vas a enviar"><div><strong>Foto lista</strong><span id="attachment-size"></span></div><label class="noir-photo-expiry">Duración <select id="chat-photo-duration" aria-label="Duración de la foto"><option value="0">Permanente</option><option value="3600">Efímera · 1 hora</option><option value="86400">Efímera · 24 horas</option></select></label><button id="remove-attachment-btn" aria-label="Quitar foto">✕</button></div>
                     <div class="chat-input-area">
                         <input type="file" id="chat-img-input" accept="image/*">
                         <button id="chat-img-btn" class="chat-btn-icon" disabled title="Enviar Imagen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></svg></button>
@@ -198,7 +198,7 @@
             <img id="full-photo-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 8px; border: 2px solid var(--text-gold); box-shadow: 0 10px 40px rgba(0,0,0,0.9); object-fit: contain;">
         </div>
     </div>
-    <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO · v2.3</div></div>
+    <div class="footer"><div>Templo La Paz Sauce</div><div>NOIR PRIVADO · v2.4</div></div>
 
     <nav id="mobile-nav" aria-label="Navegación principal" hidden>
       <button data-target="sec-evento"><span>☽</span>Inicio</button><button data-target="sec-modelos"><span>♧</span>Modelos</button><button data-target="sec-mercancia"><span>◇</span>Boutique</button><button data-target="sec-chat"><span>◌<b class="unread-total" hidden></b></span>Chat</button><button data-target="sec-perfil"><span>○</span>Perfil</button>
@@ -211,6 +211,6 @@
       <div id="friend-result" aria-live="polite"></div>
     </dialog>
     <dialog id="confirm-dialog" class="noir-dialog"><h2>Confirmar</h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel" class="subtle-button">Cancelar</button><button id="confirm-accept" class="gold-button">Confirmar</button></div></dialog>
-    <script src="/app.js?v=20261008-5" defer></script>
+    <script src="/app.js?v=20261008-6" defer></script>
 </body>
 </html>
