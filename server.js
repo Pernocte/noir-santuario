@@ -263,6 +263,30 @@ function createApp(db, options = {}) {
         res.json({ message: 'Contacto añadido. La conexión es mutua.' });
     });
     const conversation = '(remitente_codigo = ? AND destinatario_codigo = ?) OR (remitente_codigo = ? AND destinatario_codigo = ?)';
+    app.get('/api/mensajes/foto/:id', async (req, res) => {
+        if (!/^\d+$/.test(req.params.id)) throw fail(400, 'Foto inválida.');
+        await ensureChatMedia();
+        const [rows] = await db.query(`SELECT m.remitente_codigo, m.destinatario_codigo, m.mensaje, c.mime, c.content, c.expires_at
+            FROM noir_chat_media c JOIN mensajes m ON m.id = c.message_id WHERE c.message_id = ?`, [req.params.id]);
+        const photo = rows[0];
+        if (!photo) throw fail(404, 'Foto no disponible.');
+        if (photo.remitente_codigo !== req.user.codigo && photo.destinatario_codigo !== req.user.codigo) throw fail(403, 'No autorizado.');
+        // First explicit recipient opening starts a 15-second lifetime.
+        if (photo.mensaje === '[NOIR_FOTO_15]' && !photo.expires_at) {
+            if (photo.destinatario_codigo !== req.user.codigo) throw fail(403, 'Solo el destinatario puede abrir esta foto.');
+            await db.query("UPDATE noir_chat_media SET expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 SECOND) WHERE message_id = ? AND expires_at IS NULL", [req.params.id]);
+            const [started] = await db.query('SELECT expires_at FROM noir_chat_media WHERE message_id = ?', [req.params.id]);
+            photo.expires_at = started[0]?.expires_at;
+        }
+        if (photo.expires_at && new Date(photo.expires_at).getTime() <= Date.now()) {
+            await db.query('DELETE FROM noir_chat_media WHERE message_id = ?', [req.params.id]);
+            throw fail(410, 'Esta fotografía ha caducado.');
+        }
+        res.set('Cache-Control', 'private, no-store');
+        if (photo.expires_at) res.set('X-Noir-Expires-At', new Date(photo.expires_at).toISOString());
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.type(photo.mime).send(photo.content);
+    });
     app.get('/api/mensajes/:user1/:user2', own, async (req, res) => {
         const other = await recipient(req.params.user2);
         const pair = [req.user.codigo, other.codigo, other.codigo, req.user.codigo];
@@ -306,7 +330,7 @@ function createApp(db, options = {}) {
     app.post('/api/mensajes/foto', async (req, res) => {
         const other = await recipient(req.body.destinatario);
         const duration = Number(req.body.duration || 0);
-        if (![0, 3600, 86400].includes(duration)) throw fail(400, 'Duración de foto inválida.');
+        if (![0, 15, 3600, 86400].includes(duration)) throw fail(400, 'Duración de foto inválida.');
         const raw = imageData(req.body.imagen);
         const match = raw.match(/^data:image\/(jpeg|png|webp|gif);base64,([\s\S]+)$/);
         if (!match) throw fail(400, 'Foto inválida.');
@@ -320,30 +344,14 @@ function createApp(db, options = {}) {
         }
         if (bytes.length > 9 * 1024 * 1024) throw fail(413, 'La foto supera el límite permitido.');
         await ensureChatMedia();
-        const expires = duration ? new Date(Date.now() + duration * 1000) : null;
+        const expires = duration && duration !== 15 ? new Date(Date.now() + duration * 1000) : null;
         const result = await transaction(db, async connection => {
             await linkUsers(connection, req.user.codigo, other.codigo);
-            const [row] = await connection.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [req.user.codigo, other.codigo, '[NOIR_FOTO]']);
+            const [row] = await connection.query('INSERT INTO mensajes (remitente_codigo, destinatario_codigo, mensaje) VALUES (?, ?, ?)', [req.user.codigo, other.codigo, duration === 15 ? '[NOIR_FOTO_15]' : '[NOIR_FOTO]']);
             await connection.query('INSERT INTO noir_chat_media (message_id, mime, content, expires_at) VALUES (?, ?, ?, ?)', [row.insertId, mime, bytes, expires]);
             return row;
         });
         res.json({ success: true, id: result.insertId });
-    });
-    app.get('/api/mensajes/foto/:id', async (req, res) => {
-        if (!/^\d+$/.test(req.params.id)) throw fail(400, 'Foto inválida.');
-        await ensureChatMedia();
-        const [rows] = await db.query(`SELECT m.remitente_codigo, m.destinatario_codigo, c.mime, c.content, c.expires_at
-            FROM noir_chat_media c JOIN mensajes m ON m.id = c.message_id WHERE c.message_id = ?`, [req.params.id]);
-        const photo = rows[0];
-        if (!photo) throw fail(404, 'Foto no disponible.');
-        if (photo.remitente_codigo !== req.user.codigo && photo.destinatario_codigo !== req.user.codigo) throw fail(403, 'No autorizado.');
-        if (photo.expires_at && new Date(photo.expires_at).getTime() <= Date.now()) {
-            await db.query('DELETE FROM noir_chat_media WHERE message_id = ?', [req.params.id]);
-            throw fail(410, 'Esta fotografía ha caducado.');
-        }
-        res.set('Cache-Control', 'private, no-store');
-        res.set('X-Content-Type-Options', 'nosniff');
-        res.type(photo.mime).send(photo.content);
     });
     app.post('/api/mensajes', async (req, res) => {
         const { destinatario, mensaje } = req.body;
