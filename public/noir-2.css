@@ -222,3 +222,5 @@ button{touch-action:manipulation}
 #attachment-preview{flex-wrap:wrap;gap:9px}
 .msg-bubble .msg-image{object-fit:contain;max-height:360px;border-radius:12px}
 @media(max-width:768px){.noir-photo-expiry{width:100%;justify-content:space-between;white-space:normal}.noir-photo-expiry select{max-width:190px}.msg-bubble .msg-image{max-height:300px;max-width:100%}}
+
+.noir-expiring-photo{background:#292319;color:#e8d2a5;border:1px solid #a48750;border-radius:12px;padding:16px;cursor:pointer;min-height:50px;font:600 12px var(--font-sans)}.noir-expiring-photo:disabled{opacity:.7;cursor:default}
