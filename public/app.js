@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!Array.isArray(items)) throw new Error('Catálogo inválido.');
             const fragment = document.createDocumentFragment();
             for (const item of items) {
-                const card = element('div', 'grid-item'); card.dataset.name = item.nombre.toLocaleLowerCase();
+                const card = element('div', 'grid-item'); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
                 const img = image(item.miniatura || item.imagen, 'grid-item-img', item.nombre);
                 card.append(img, element('h3', 'catalog-name', item.nombre));
                 if (currentUser.rol === 'admin') {
@@ -215,13 +215,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function filterCatalog() {
+        const grid = $('grid-mercancia-dinamico');
         const query = $('catalog-search').value.trim().toLocaleLowerCase();
-        const cards = [...$('grid-mercancia-dinamico').querySelectorAll('.grid-item')];
-        cards.forEach(card => card.hidden = !card.dataset.name.includes(query));
+        const sort = $('catalog-sort').value;
+        const cards = [...grid.querySelectorAll('.grid-item')];
+        const originalOrder = new Map(cards.map((card, index) => [card, index]));
+        const textCompare = (a, b) => a.dataset.name.localeCompare(b.dataset.name, 'es');
+        cards.sort((a, b) => {
+            let order = 0;
+            if (sort === 'name') order = textCompare(a, b);
+            if (sort === 'price-asc') order = Number(a.dataset.price) - Number(b.dataset.price);
+            if (sort === 'price-desc') order = Number(b.dataset.price) - Number(a.dataset.price);
+            if (sort === 'rating') order = Number(b.dataset.rating) - Number(a.dataset.rating);
+            return order || originalOrder.get(a) - originalOrder.get(b);
+        });
+        // Reordering existing cards preserves their event listeners and images.
+        cards.forEach(card => { card.hidden = !card.dataset.name.includes(query); grid.append(card); });
+        const visible = cards.filter(card => !card.hidden).length;
+        $('catalog-count').textContent = cards.length ? `${visible} de ${cards.length} productos` : '';
         $('catalog-no-matches')?.remove();
-        if (cards.length && cards.every(card => card.hidden)) { const empty = element('p', 'load-status', 'No hay productos con ese nombre.'); empty.id = 'catalog-no-matches'; $('grid-mercancia-dinamico').append(empty); }
+        if (cards.length && !visible) {
+            const empty = element('p', 'load-status', 'No encontramos productos con ese nombre.');
+            empty.id = 'catalog-no-matches'; grid.append(empty);
+        }
     }
     $('catalog-search').addEventListener('input', filterCatalog);
+    $('catalog-sort').addEventListener('change', filterCatalog);
     bind('refresh-catalog-btn', () => cargarItems(document.querySelector('.sub-nav-btn.active')?.dataset.subcat || 'juguetes', true));
     document.querySelectorAll('[data-open-chat]').forEach(button => button.onclick = () => switchTab('sec-chat'));
     bind('copy-nick-btn', async () => {
