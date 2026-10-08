@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.body.dataset.lastTab !== id) {
             const previousTab = document.body.dataset.lastTab;
             document.body.dataset.lastTab = id;
-            if (previousTab) window.scrollTo({ top: 0, behavior: 'instant' });
+            if (previousTab && typeof window.scrollTo === 'function') { try { window.scrollTo(0, 0); } catch (_) { /* embedded browser */ } }
         }
         if (id !== 'sec-chat') invalidateChat();
         if (id === 'sec-chat') { cargarContactos().catch(report); if (chatVisible()) cargarMensajes(); }
