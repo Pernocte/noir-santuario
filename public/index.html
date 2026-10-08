@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/noir-2.css">
 </head>
 <body>
 
@@ -71,7 +72,7 @@
 
             <button class="admin-add-btn admin-only-block" id="btn-add-boutique" onclick="abrirModalAgregar('juguetes')">+ AÑADIR A JUGUETES</button>
             
-            <div class="catalog-toolbar"><input type="search" id="catalog-search" class="input-field" placeholder="Buscar productos…" aria-label="Buscar productos"><button id="refresh-catalog-btn" class="subtle-button">Actualizar</button></div><div class="grid-layout" id="grid-mercancia-dinamico"></div>
+            <div class="catalog-toolbar"><input type="search" id="catalog-search" class="input-field" placeholder="Buscar productos…" aria-label="Buscar productos"><select id="catalog-sort" class="input-field" aria-label="Ordenar productos"><option value="default">Destacados</option><option value="name">Nombre A–Z</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option><option value="rating">Mejor valorados</option></select><button id="refresh-catalog-btn" class="subtle-button">Actualizar</button></div><div id="catalog-count" class="catalog-count" role="status" aria-live="polite"></div><div class="grid-layout" id="grid-mercancia-dinamico"></div>
         </div>
 
         <div id="sec-perfil" class="section-content">
