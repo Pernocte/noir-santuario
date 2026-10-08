@@ -142,8 +142,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (id === 'sec-mercancia') cambiarSubCategoria(document.querySelector('.sub-nav-btn.active')?.dataset.subcat || 'juguetes');
     }
     document.querySelectorAll('.nav-menu .nav-btn[data-target], #mobile-nav [data-target]').forEach(node => node.addEventListener('click', () => switchTab(node.dataset.target)));
+    // Event dates are interpreted in La Paz (UTC-04:00), independently of the visitor's timezone.
+    // When an administrator writes a date without a year, use the current La Paz year.
+    let eventDeadline = null;
+    const monthNames = { enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8, septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12 };
+    function parseEventDate(dateText, timeText) {
+        const raw = String(dateText || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const hourMatch = String(timeText || '').match(/(\d{1,2}):(\d{2})/);
+        const hours = hourMatch ? Number(hourMatch[1]) : 0;
+        const minutes = hourMatch ? Number(hourMatch[2]) : 0;
+        if (hours > 23 || minutes > 59) return null;
+        let day, month, year;
+        const word = raw.match(/(\d{1,2})\s*(?:de\s+)?([a-z]+)(?:\s*(?:de\s+)?(\d{4}))?/);
+        const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        const numeric = raw.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{4}))?$/);
+        const lapazYear = Number(new Intl.DateTimeFormat('en', { timeZone:'America/La_Paz', year:'numeric' }).format(new Date()));
+        if (iso) { year=Number(iso[1]); month=Number(iso[2]); day=Number(iso[3]); }
+        else if (numeric) { day=Number(numeric[1]); month=Number(numeric[2]); year=Number(numeric[3] || lapazYear); }
+        else if (word) { day=Number(word[1]); month=monthNames[word[2]]; year=Number(word[3] || lapazYear); }
+        if (!year || !month || !day || !Number.isInteger(day)) return null;
+        const utc = Date.UTC(year, month - 1, day, hours + 4, minutes);
+        const check = new Date(utc - 4 * 3600000);
+        if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+        return utc;
+    }
+    function updateEventCountdown() {
+        const wrapper = $('event-countdown');
+        if (!eventDeadline) { wrapper.hidden = true; return; }
+        wrapper.hidden = false;
+        const difference = Math.max(0, eventDeadline - Date.now());
+        const days = Math.floor(difference / 86400000);
+        const hours = Math.floor(difference / 3600000) % 24;
+        const minutes = Math.floor(difference / 60000) % 60;
+        const seconds = Math.floor(difference / 1000) % 60;
+        for (const [key, value] of [['days',days],['hours',hours],['minutes',minutes],['seconds',seconds]]) {
+            $('count-' + key).textContent = String(value).padStart(2, '0');
+        }
+        $('countdown-status').textContent = difference ? '' : 'El encuentro ha comenzado o la fecha ya pasó.';
+    }
+    setInterval(() => { if (!document.hidden) updateEventCountdown(); }, 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) updateEventCountdown(); });
     async function cargarEvento() {
         const event = await api('/evento');
+        eventDeadline = parseEventDate(event.fecha, event.hora);
+        updateEventCountdown();
         for (const key of ['titulo', 'fecha', 'hora', 'desc']) {
             const value = event[key === 'desc' ? 'descripcion' : key] || '';
             $(`ev-${key}`).textContent = value; $(`adm-ev-${key}`).value = value;
