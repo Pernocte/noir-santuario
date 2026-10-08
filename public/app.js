@@ -182,6 +182,15 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const item of items) {
                 const card = element('div', 'grid-item'); card.dataset.originalIndex = String(fragment.childElementCount); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
                 const img = image(item.miniatura || item.imagen, 'grid-item-img', item.nombre);
+                if (category !== 'modelos' && fragment.childElementCount === 0) {
+                    const feature = $('noir-feature-art');
+                    if (feature) {
+                        feature.replaceChildren();
+                        const visual = image(item.miniatura || item.imagen, '', 'Imagen destacada');
+                        visual.loading = 'eager';
+                        feature.append(visual);
+                    }
+                }
                 // Fetch visible cards first, keep the rest demand-loaded while scrolling.
                 if (fragment.childElementCount < (window.innerWidth <= 768 ? 2 : 5)) {
                     img.loading = 'eager'; img.fetchPriority = fragment.childElementCount === 0 ? 'high' : 'auto';
