@@ -486,7 +486,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function makeBubble(message) {
         const mine = message.remitente_codigo === currentUser.codigo;
         const bubble = element('div', `msg-bubble ${mine ? 'msg-sent' : 'msg-received'}`); bubble.dataset.id = message.id;
-        if (/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(message.mensaje)) {
+        if (message.mensaje === '[NOIR_FOTO]') {
+            const img = image('/api/mensajes/foto/' + encodeURIComponent(message.id), 'msg-image', 'Fotografía privada');
+            img.loading = 'eager'; img.onclick = () => verFotoCompleta(img.src);
+            bubble.append(img);
+        } else if (/^data:image\\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(message.mensaje)) {
             const img = image(message.mensaje, 'msg-image', 'Imagen de chat'); img.loading = 'eager';
             img.onclick = () => verFotoCompleta(message.mensaje);
             img.onload = () => { const box = $('chat-box'); if (bubble.dataset.keepBottom === '1') box.scrollTop = box.scrollHeight; };
@@ -570,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function deliver(pending) {
         try {
-            await api('/mensajes', { method: 'POST', body: { destinatario: pending.recipient, mensaje: pending.content } });
+            await api(pending.isPhoto ? '/mensajes/foto' : '/mensajes', { method: 'POST', body: pending.isPhoto ? { destinatario: pending.recipient, imagen: pending.content, duration: pending.duration || 0 } : { destinatario: pending.recipient, mensaje: pending.content } });
             removePending(pending);
             if (activeChatCode === pending.recipient) { renderPending(); await cargarMensajes(true); }
             cargarContactos().catch(() => {});
@@ -581,8 +585,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sending || deleting || preparingPhoto || !recipient) return;
         const photo = attachment?.recipient === recipient ? attachment.data : null, value = input.value;
         if (!photo && !value.trim()) return;
-        const contents = [...(photo ? [photo] : []), ...(value.trim() ? [value] : [])];
-        const pending = contents.map(content => ({ content, recipient, failed: false }));
+        const duration = Number($('chat-photo-duration').value);
+        const pending = [...(photo ? [{ content: photo, recipient, isPhoto: true, duration, failed: false }] : []), ...(value.trim() ? [{ content: value, recipient, failed: false }] : [])];
+        $('chat-photo-duration').value = '0';
         pendingSends.set(recipient, [...(pendingSends.get(recipient) || []), ...pending]);
         input.value = ''; drafts.delete(recipient); clearAttachment(); resizeComposer(); sending = true; setChatControls(); renderPending(); $('chat-box').scrollTop = $('chat-box').scrollHeight;
         try { for (const item of pending) await deliver(item); }
