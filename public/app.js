@@ -135,12 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (node.dataset.target === id) node.setAttribute('aria-current', 'page');
             else node.removeAttribute('aria-current');
         });
-        // Reset the scroll after a screen change, not the user's position in each catalog.
-        if (document.body.dataset.lastTab !== id) {
-            const previousTab = document.body.dataset.lastTab;
-            document.body.dataset.lastTab = id;
-            if (previousTab && typeof window.scrollTo === 'function') { try { window.scrollTo(0, 0); } catch (_) { /* embedded browser */ } }
-        }
+        document.body.dataset.lastTab = id;
         if (id !== 'sec-chat') invalidateChat();
         if (id === 'sec-chat') { cargarContactos().catch(report); if (chatVisible()) cargarMensajes(); }
         if (id === 'sec-modelos') cargarItems('modelos');
@@ -188,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = element('div', 'grid-item'); card.dataset.originalIndex = String(fragment.childElementCount); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
                 const img = image(item.miniatura || item.imagen, 'grid-item-img', item.nombre);
                 // Fetch visible cards first, keep the rest demand-loaded while scrolling.
-                if (fragment.childElementCount < (matchMedia('(max-width:768px)').matches ? 2 : 5)) {
+                if (fragment.childElementCount < (window.innerWidth <= 768 ? 2 : 5)) {
                     img.loading = 'eager'; img.fetchPriority = fragment.childElementCount === 0 ? 'high' : 'auto';
                 }
                 card.append(img, element('h3', 'catalog-name', item.nombre));
@@ -421,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.contact-item').forEach(row => row.classList.toggle('active', row.dataset.codigo === contact.codigo));
         updateHeader(contact); $('delete-chat-btn').style.display = 'block';
         $('mobile-sidebar').classList.add('hidden-mobile'); $('mobile-chat-main').classList.add('active-mobile'); setChatControls(); renderPending(); cargarMensajes(true);
-        if (matchMedia('(max-width:768px)').matches) {
+        if (window.innerWidth <= 768) {
             $('chat-input').focus({ preventScroll: true });
         }
     }
