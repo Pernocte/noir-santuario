@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!Array.isArray(items)) throw new Error('Catálogo inválido.');
             const fragment = document.createDocumentFragment();
             for (const item of items) {
-                const card = element('div', 'grid-item'); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
+                const card = element('div', 'grid-item'); card.dataset.originalIndex = String(fragment.childElementCount); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
                 const img = image(item.miniatura || item.imagen, 'grid-item-img', item.nombre);
                 card.append(img, element('h3', 'catalog-name', item.nombre));
                 if (currentUser.rol === 'admin') {
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = $('catalog-search').value.trim().toLocaleLowerCase();
         const sort = $('catalog-sort').value;
         const cards = [...grid.querySelectorAll('.grid-item')];
-        const originalOrder = new Map(cards.map((card, index) => [card, index]));
+        const originalOrder = new Map(cards.map((card, index) => [card, Number(card.dataset.originalIndex ?? index)]));
         const textCompare = (a, b) => a.dataset.name.localeCompare(b.dataset.name, 'es');
         cards.sort((a, b) => {
             let order = 0;
