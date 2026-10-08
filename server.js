@@ -283,6 +283,7 @@ function createApp(db, options = {}) {
     // Separate binary media avoids the 64 KB TEXT ceiling in legacy mensajes.
     // Additive table only: existing user/message tables are untouched.
     let chatMediaInit;
+    let chatMediaCleanup;
     function ensureChatMedia() {
         if (!chatMediaInit) chatMediaInit = db.query(`CREATE TABLE IF NOT EXISTS noir_chat_media (
             message_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
@@ -290,7 +291,16 @@ function createApp(db, options = {}) {
             content MEDIUMBLOB NOT NULL,
             expires_at DATETIME NULL,
             INDEX idx_noir_chat_expiration (expires_at)
-        ) ENGINE=InnoDB`).catch(error => { chatMediaInit = null; throw error; });
+        ) ENGINE=InnoDB`).then(() => {
+            if (!chatMediaCleanup) {
+                // Expired media is deleted even when nobody reopens a conversation.
+                chatMediaCleanup = setInterval(() => {
+                    db.query('DELETE FROM noir_chat_media WHERE expires_at IS NOT NULL AND expires_at <= UTC_TIMESTAMP()')
+                        .catch(error => console.error('Chat media cleanup:', error.code || error.name));
+                }, 15 * 60 * 1000);
+                chatMediaCleanup.unref?.();
+            }
+        }).catch(error => { chatMediaInit = null; throw error; });
         return chatMediaInit;
     }
     app.post('/api/mensajes/foto', async (req, res) => {
