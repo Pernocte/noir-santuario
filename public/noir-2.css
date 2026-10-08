@@ -66,3 +66,10 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;ba
   #mobile-nav:not([hidden]){padding-top:7px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* Boutique: filters and real-time result count */
+.catalog-toolbar{flex-wrap:wrap}
+#catalog-sort{width:auto;min-width:170px;max-width:220px;flex:0 0 auto;background:#151619;color:#e7dece;cursor:pointer}
+.catalog-count{width:100%;text-align:right;color:#a9a093;font-size:12px;letter-spacing:.04em;min-height:20px;margin:0 0 6px}
+.grid-item[hidden]{display:none!important}
+@media(max-width:600px){#catalog-sort{min-width:0;max-width:none;width:calc(55% - 5px)}.catalog-toolbar #refresh-catalog-btn{flex:1}.catalog-toolbar input{flex-basis:100%}.catalog-count{text-align:left}}
