@@ -64,7 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function background(node, url) { node.style.backgroundImage = url ? `url(${JSON.stringify(url)})` : 'none'; }
     function image(url, className, name = 'Fotografía') {
         const img = element('img', className);
-        img.alt = name; img.loading = 'lazy'; img.decoding = 'async'; img.src = url || '';
+        img.alt = name; img.loading = 'lazy'; img.decoding = 'async';
+        img.classList.add('noir-progressive-image');
+        img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+        img.src = url || '';
         img.addEventListener('error', () => { img.alt = 'No se pudo cargar la foto'; img.classList.add('image-error'); });
         return img;
     }
@@ -128,6 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.nav-menu .nav-btn[data-target], #mobile-nav [data-target]').forEach(node => node.classList.toggle('active', node.dataset.target === id));
         document.querySelectorAll('.section-content').forEach(node => node.classList.toggle('active', node.id === id));
         document.body.classList.toggle('chat-mode', id === 'sec-chat');
+        document.querySelectorAll('.nav-menu .nav-btn[data-target], #mobile-nav [data-target]').forEach(node => {
+            if (node.dataset.target === id) node.setAttribute('aria-current', 'page');
+            else node.removeAttribute('aria-current');
+        });
+        document.body.dataset.lastTab = id;
         if (id !== 'sec-chat') invalidateChat();
         if (id === 'sec-chat') { cargarContactos().catch(report); if (chatVisible()) cargarMensajes(); }
         if (id === 'sec-modelos') cargarItems('modelos');
@@ -174,6 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const item of items) {
                 const card = element('div', 'grid-item'); card.dataset.originalIndex = String(fragment.childElementCount); card.dataset.name = item.nombre.toLocaleLowerCase(); card.dataset.price = String(Number(item.precio) || 0); card.dataset.rating = String(Number(item.promedio_estrellas) || 0);
                 const img = image(item.miniatura || item.imagen, 'grid-item-img', item.nombre);
+                // Fetch visible cards first, keep the rest demand-loaded while scrolling.
+                if (fragment.childElementCount < (window.innerWidth <= 768 ? 2 : 5)) {
+                    img.loading = 'eager'; img.fetchPriority = fragment.childElementCount === 0 ? 'high' : 'auto';
+                }
                 card.append(img, element('h3', 'catalog-name', item.nombre));
                 if (currentUser.rol === 'admin') {
                     const del = element('button', 'del-btn', 'X'); del.style.display = 'block';
@@ -404,6 +416,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.contact-item').forEach(row => row.classList.toggle('active', row.dataset.codigo === contact.codigo));
         updateHeader(contact); $('delete-chat-btn').style.display = 'block';
         $('mobile-sidebar').classList.add('hidden-mobile'); $('mobile-chat-main').classList.add('active-mobile'); setChatControls(); renderPending(); cargarMensajes(true);
+        if (window.innerWidth <= 768) {
+            $('chat-input').focus({ preventScroll: true });
+        }
     }
     bind('back-to-contacts-btn', () => {
         if (activeChatCode) drafts.set(activeChatCode, $('chat-input').value);
@@ -553,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const results = await Promise.allSettled([cargarContactos(), cargarMensajes()]);
                 if (results[0].status === 'rejected') chatNotice.textContent = results[0].reason.message;
             }
-        } finally { setTimeout(radar, 3000); }
+        } finally { setTimeout(radar, document.hidden ? 12000 : (chatVisible() ? 2800 : 6500)); }
     }
     document.addEventListener('visibilitychange', () => { if (document.hidden) invalidateChat(); else if (chatVisible()) cargarMensajes(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('photo-modal').style.display = 'none'; $('add-item-modal').style.display = 'none'; $('close-modal').click(); } });
