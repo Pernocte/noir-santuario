@@ -486,7 +486,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function makeBubble(message) {
         const mine = message.remitente_codigo === currentUser.codigo;
         const bubble = element('div', `msg-bubble ${mine ? 'msg-sent' : 'msg-received'}`); bubble.dataset.id = message.id;
-        if (message.mensaje === '[NOIR_FOTO]') {
+        if (message.mensaje === '[NOIR_FOTO_15]') {
+            const open = element('button', 'noir-expiring-photo', '◷ Ver foto · 15 segundos');
+            open.type = 'button';
+            open.onclick = async () => {
+                open.disabled = true; open.textContent = 'Abriendo foto…';
+                try {
+                    const response = await fetch('/api/mensajes/foto/' + encodeURIComponent(message.id), { credentials: 'same-origin', cache: 'no-store' });
+                    if (!response.ok) throw new Error(response.status === 410 || response.status === 404 ? 'La foto ya no está disponible.' : 'No se pudo abrir la foto.');
+                    const blob = await response.blob();
+                    const expires = Date.parse(response.headers.get('X-Noir-Expires-At') || '') || Date.now() + 15000;
+                    const url = URL.createObjectURL(blob);
+                    const img = image(url, 'msg-image', 'Foto efímera');
+                    img.loading = 'eager';
+                    img.onclick = () => verFotoCompleta(url);
+                    open.replaceWith(img);
+                    const expire = () => {
+                        img.replaceWith(element('span', 'message-text', 'Foto efímera caducada'));
+                        if ($('full-photo-img').src === url) $('photo-modal').style.display = 'none';
+                        URL.revokeObjectURL(url);
+                    };
+                    setTimeout(expire, Math.max(0, expires - Date.now()));
+                } catch (error) { open.disabled = true; open.textContent = error.message; }
+            };
+            bubble.append(open);
+        } else if (message.mensaje === '[NOIR_FOTO]') {
             const img = image('/api/mensajes/foto/' + encodeURIComponent(message.id), 'msg-image', 'Fotografía privada');
             img.loading = 'eager'; img.onclick = () => verFotoCompleta(img.src);
             bubble.append(img);
