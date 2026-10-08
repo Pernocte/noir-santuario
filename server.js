@@ -303,7 +303,12 @@ function createApp(db, options = {}) {
         res.json({ success: true });
     });
     app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
-    app.use(express.static(path.join(__dirname, 'public')));
+    // HTML must be revalidated after deploys; static assets use versioned URLs.
+    app.use(express.static(path.join(__dirname, 'public'), {
+        setHeaders(res, filePath) {
+            if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        }
+    }));
     app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
     app.use((error, req, res, next) => {
         if (res.headersSent) return next(error);
