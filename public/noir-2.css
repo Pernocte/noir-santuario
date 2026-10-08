@@ -127,3 +127,64 @@ button{touch-action:manipulation}
   #mobile-nav button{font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){.noir-progressive-image{transition:none}.section-content.active{animation:none}}
+
+/* NOIR 2.2 — editorial design system, structural overhaul */
+:root{--noir-display:'Playfair Display',Georgia,serif}
+#dashboard-view{max-width:1320px}
+#sec-evento,#sec-modelos,#sec-mercancia{align-items:stretch}
+.noir-editorial-kicker{display:block;font:600 10px var(--font-sans);letter-spacing:.34em;color:#c6a976;text-transform:uppercase}
+#sec-evento>.noir-editorial-kicker{padding:14px 0 20px;text-align:center}
+.noir-section-intro{width:100%;margin:30px 0 26px;text-align:center}
+.noir-section-intro h2{font:400 clamp(35px,4.5vw,64px)/1.15 var(--noir-display);margin:15px 0 8px;color:#f0e4cf;letter-spacing:-.025em}
+.noir-section-intro p{color:#a9a299;font-size:13px;line-height:1.7;margin:0}
+#event-display-mode.noir-event-hero{max-width:none;min-height:clamp(480px,60vh,720px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;padding:0;overflow:hidden;background:linear-gradient(110deg,#141314,#191719);border-color:#544633;box-shadow:0 40px 100px #0008}
+#event-display-mode.noir-event-hero:before,#event-display-mode.noir-event-hero:after{display:none}
+.noir-event-copy{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:16px;text-align:left;padding:clamp(30px,6vw,88px);position:relative;z-index:2}
+.noir-event-copy:before{content:'PRÓXIMO ENCUENTRO  /  ACCESO PRIVADO';font:600 10px var(--font-sans);letter-spacing:.28em;color:#cdb384}
+#event-display-mode #ev-titulo{font:400 clamp(38px,4.2vw,68px)/1.09 var(--noir-display)!important;text-align:left;text-transform:uppercase;color:#f2e6d1!important;margin:12px 0}
+#event-display-mode #ev-fecha{font-size:clamp(18px,2vw,25px)!important;margin:0!important;color:#ddccab}
+#event-display-mode #ev-hora{font-size:14px!important;letter-spacing:.14em}
+#event-display-mode hr{width:85%;border:0;border-top:1px solid #5c4a33!important;margin:12px 0!important}
+#event-display-mode #ev-desc{text-align:left;font-size:14px!important;max-width:420px}
+.noir-hero-ornament{grid-column:2;grid-row:1;min-height:470px;display:grid;place-items:center;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 44%,#6b5131 0%,#332920 28%,#111012 65%);}
+.noir-hero-ornament:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(116deg,transparent 0 34px,rgba(225,193,128,.025) 35px 36px),linear-gradient(0deg,#060608c9,transparent 38%);}
+.noir-hero-arch{width:60%;aspect-ratio:3/4;max-height:420px;border:1px solid #b39153;border-radius:46% 46% 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;box-shadow:0 0 0 12px #bf98500a,inset 0 0 60px #0008}
+.noir-hero-arch:before{content:'☾';font:80px var(--noir-display);color:#c3a66e;margin-bottom:14px}
+.noir-hero-arch span{font:400 clamp(38px,5vw,78px) var(--noir-display);letter-spacing:.22em;color:#dfc99b;padding-left:.22em}
+.noir-hero-arch small{letter-spacing:.23em;font-size:9px;color:#b8a888}
+.noir-boutique-feature{min-height:340px;display:grid;grid-template-columns:1fr 1fr;margin:0 0 32px;border:1px solid #4c4032;background:#151414;border-radius:6px;overflow:hidden}
+.noir-boutique-feature-copy{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:clamp(30px,5vw,80px)}
+.noir-boutique-feature h3{font:400 clamp(33px,4vw,60px)/1.14 var(--noir-display);color:#f0e4cf;margin:18px 0}
+.noir-boutique-feature p{color:#b7aea1;font-size:14px}
+.noir-feature-link{font-size:10px;letter-spacing:.15em;color:#dfc18c;border-bottom:1px solid #957647;padding:16px 0}
+.noir-feature-art{background:radial-gradient(circle at 50% 60%,#4f3b2d,#151314 65%);display:grid;place-items:center;overflow:hidden;min-height:300px;position:relative}
+.noir-feature-art:before{content:'';position:absolute;inset:10%;border:1px solid #9a76445a;pointer-events:none}
+.noir-feature-art>span{font:400 clamp(55px,8vw,135px) var(--noir-display);color:#c7a873;letter-spacing:.2em}
+.noir-feature-art img{width:100%;height:100%;max-height:480px;object-fit:cover;filter:brightness(.75);position:absolute;inset:0}
+#sec-mercancia .grid-layout,#sec-modelos .grid-layout{grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:20px}
+#sec-mercancia .grid-item,#sec-modelos .grid-item{background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;text-align:left;align-items:stretch;overflow:visible}
+#sec-mercancia .grid-item:hover,#sec-modelos .grid-item:hover{transform:translateY(-3px)}
+#sec-mercancia .grid-item-img,#sec-modelos .grid-item-img{height:clamp(230px,26vw,350px);border-radius:4px;background:#222024;margin-bottom:12px}
+#sec-mercancia .catalog-name,#sec-modelos .catalog-name{font-size:14px;line-height:1.5;text-align:left}
+#sec-mercancia .item-price{font-size:14px;color:#d0b17c}
+#sec-mercancia .rate-product-button{border:0;border-bottom:1px solid #685438;border-radius:0;text-align:left;padding:12px 0}
+#sec-perfil .profile-header{position:relative;overflow:hidden;padding-top:150px;background:linear-gradient(180deg,#322719 0,#18171a 140px,#111113 141px)}
+#sec-perfil .profile-header:before{content:'NOIR  /  MI SANTUARIO';position:absolute;top:48px;left:0;right:0;font:400 clamp(20px,4vw,36px) var(--noir-display);letter-spacing:.22em;text-align:center;color:#cab08066;pointer-events:none}
+#sec-perfil .profile-avatar-large{position:relative;z-index:1}
+@media(max-width:768px){
+ #event-display-mode.noir-event-hero{grid-template-columns:1fr;min-height:0}
+ .noir-hero-ornament{grid-column:1;grid-row:1;min-height:240px;max-height:290px}
+ .noir-hero-arch{height:200px;width:160px}
+ .noir-hero-arch:before{font-size:37px}.noir-hero-arch span{font-size:36px}
+ .noir-event-copy{grid-row:2;padding:28px 22px 36px;gap:12px}
+ #event-display-mode #ev-titulo{font-size:clamp(30px,8vw,44px)!important}
+ .noir-boutique-feature{grid-template-columns:1fr;min-height:0}
+ .noir-boutique-feature-copy{padding:26px 22px}
+ .noir-boutique-feature h3{font-size:34px}
+ .noir-feature-art{min-height:200px;max-height:230px}
+ .noir-section-intro{margin:18px 0}
+ .noir-section-intro h2{font-size:36px}
+ #sec-mercancia .grid-layout,#sec-modelos .grid-layout{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 11px}
+ #sec-mercancia .grid-item-img,#sec-modelos .grid-item-img{height:clamp(160px,48vw,260px)}
+ #sec-perfil .profile-header{padding-top:110px}
+}
